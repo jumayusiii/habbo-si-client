@@ -22,7 +22,7 @@ namespace HabboSiClient
         public int Width = 1360, Height = 860;
         public bool Maximized;
 
-        // kept so the custom palette stays loadable; the client offers the three built-in themes
+        // kept so the custom palette stays loadable; the client offers the built-in themes
         public Color SurfaceColor = Color.FromArgb(18, 32, 58);
         public Color AccentColor = Color.FromArgb(246, 196, 82);
         public Color TextColor = Color.FromArgb(230, 239, 252);
@@ -88,6 +88,7 @@ namespace HabboSiClient
                 string mode = Str(json, "theme");
                 if (mode == "light") s.Mode = ThemeMode.Light;
                 else if (mode == "navy") s.Mode = ThemeMode.Navy;
+                else if (mode == "beta") s.Mode = ThemeMode.Beta;
                 else if (mode == "custom") s.Mode = ThemeMode.Custom;
                 else s.Mode = ThemeMode.Dark;
 
@@ -145,6 +146,7 @@ namespace HabboSiClient
         {
             if (m == ThemeMode.Light) return "light";
             if (m == ThemeMode.Navy) return "navy";
+            if (m == ThemeMode.Beta) return "beta";
             if (m == ThemeMode.Custom) return "custom";
             return "dark";
         }

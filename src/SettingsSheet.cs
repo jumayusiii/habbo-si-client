@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 
@@ -13,7 +14,7 @@ namespace HabboSiClient
         readonly ClientSettings working;
         readonly CoreWebView2 core;
 
-        ThemeTile tDark, tLight, tNavy;
+        ThemeTile tDark, tLight, tNavy, tBeta;
         ToggleRow rowGpu, rowThrottle, rowFps, rowDev, rowDiscord;
         FieldBox fieldAppId;
         FlatBtn btnFolder, btnCache, btnPortal, btnCancel, btnSave;
@@ -72,7 +73,8 @@ namespace HabboSiClient
             tDark = new ThemeTile(); tDark.Mode = ThemeMode.Dark;
             tLight = new ThemeTile(); tLight.Mode = ThemeMode.Light;
             tNavy = new ThemeTile(); tNavy.Mode = ThemeMode.Navy;
-            ThemeTile[] tiles = new ThemeTile[] { tDark, tLight, tNavy };
+            tBeta = new ThemeTile(); tBeta.Mode = ThemeMode.Beta;
+            ThemeTile[] tiles = new ThemeTile[] { tDark, tLight, tNavy, tBeta };
             foreach (ThemeTile t in tiles)
             {
                 t.Selected = t.Mode == working.Mode;
@@ -179,7 +181,8 @@ namespace HabboSiClient
             tDark.Selected = mode == ThemeMode.Dark;
             tLight.Selected = mode == ThemeMode.Light;
             tNavy.Selected = mode == ThemeMode.Navy;
-            foreach (ThemeTile t in new ThemeTile[] { tDark, tLight, tNavy }) t.Invalidate();
+            tBeta.Selected = mode == ThemeMode.Beta;
+            foreach (ThemeTile t in new ThemeTile[] { tDark, tLight, tNavy, tBeta }) t.Invalidate();
 
             // preview the palette on the sheet and on the window behind it; Cancel puts it back
             T.Apply(mode);
@@ -220,6 +223,22 @@ namespace HabboSiClient
         {
             if (IsDisposed || !IsHandleCreated) return;
             try { BeginInvoke(new Action(delegate { Invalidate(); })); }
+            catch { }
+        }
+
+        [DllImport("dwmapi.dll")]
+        static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            try
+            {
+                // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_DONOTROUND = 1.
+                // The sheet is drawn square, so DWM must not clip rounded bites out of it.
+                int square = 1;
+                DwmSetWindowAttribute(Handle, 33, ref square, sizeof(int));
+            }
             catch { }
         }
 
@@ -314,10 +333,11 @@ namespace HabboSiClient
 
             rTiles = new Rectangle(pad, y, leftW, T.P(96));
             int tileGap = T.P(10);
-            int tw = (leftW - tileGap * 2) / 3;
+            int tw = (leftW - tileGap * 3) / 4;
             tDark.SetBounds(rTiles.X, y, tw, rTiles.Height);
             tLight.SetBounds(tDark.Right + tileGap, y, tw, rTiles.Height);
             tNavy.SetBounds(tLight.Right + tileGap, y, tw, rTiles.Height);
+            tBeta.SetBounds(tNavy.Right + tileGap, y, tw, rTiles.Height);
             y += rTiles.Height + T.P(18);
 
             rPerfLabel = new Rectangle(pad, y, leftW, T.P(18));
@@ -408,9 +428,8 @@ namespace HabboSiClient
 
             T.VLine(g, rDiscLabel.X - T.P(13), rHead.Bottom + T.P(18), rFoot.Y - T.P(16), T.LineSoft);
 
-            using (GraphicsPath rim = T.Round(new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f), T.F(12f)))
             using (Pen pen = new Pen(T.Rim, 1f))
-                g.DrawPath(pen, rim);
+                g.DrawRectangle(pen, 0.5f, 0.5f, Width - 1f, Height - 1f);
         }
 
         protected override void OnMouseDown(MouseEventArgs e)

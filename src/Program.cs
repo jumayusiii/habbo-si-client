@@ -62,6 +62,7 @@ namespace HabboSiClient
             {
                 if (theme.Equals("light", StringComparison.OrdinalIgnoreCase)) settings.Mode = ThemeMode.Light;
                 else if (theme.Equals("navy", StringComparison.OrdinalIgnoreCase)) settings.Mode = ThemeMode.Navy;
+                else if (theme.Equals("beta", StringComparison.OrdinalIgnoreCase)) settings.Mode = ThemeMode.Beta;
                 else if (theme.Equals("custom", StringComparison.OrdinalIgnoreCase)) settings.Mode = ThemeMode.Custom;
                 else settings.Mode = ThemeMode.Dark;
             }
@@ -74,7 +75,7 @@ namespace HabboSiClient
                 File.WriteAllText(presenceJson, DiscordRpc.BuildActivityJson(
                     Process.GetCurrentProcess().Id,
                     DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    "In Sunset Lounge", "habbo.si", "logo",
+                    "In Sunset Lounge", "habbo.si", DiscordRpc.ArtworkUrl,
                     DiscordRpc.LargeText));
                 return;
             }

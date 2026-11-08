@@ -6,8 +6,8 @@ using System.Windows.Forms;
 
 namespace HabboSiClient
 {
-    /// <summary>The palettes the app can wear; Custom is derived from three picked colours.</summary>
-    internal enum ThemeMode { Dark, Light, Navy, Custom }
+    /// <summary>The palettes the app can wear; Beta mirrors the habbo.si CMS and Custom is derived from three picked colours.</summary>
+    internal enum ThemeMode { Dark, Light, Navy, Beta, Custom }
 
     /// <summary>Colours, fonts, scale helpers and GDI+ primitives.</summary>
     internal static class T
@@ -22,7 +22,7 @@ namespace HabboSiClient
         public static bool Light;
         public static ThemeMode Mode;
 
-        // custom (beta) theme: the three colours the user picked, kept here so Apply(Custom)
+        // custom theme: the three colours the user picked, kept here so Apply(Custom)
         // can rebuild the palette from them at any time
         public static Color CustomSurface = Color.FromArgb(18, 32, 58);
         public static Color CustomAccent = Color.FromArgb(246, 196, 82);
@@ -35,7 +35,7 @@ namespace HabboSiClient
 
         /// <summary>
         /// Fixed red for the alpha markers. Deliberately not part of any palette: an alpha tool
-        /// stays marked in Dark, Light, Navy and Custom rather than borrowing the accent.
+        /// stays marked in every palette rather than borrowing the accent.
         /// </summary>
         public static readonly Color AlphaRed = Color.FromArgb(0xE5, 0x3B, 0x43);
 
@@ -45,7 +45,7 @@ namespace HabboSiClient
         public static Color ToastBg, ToastText, Rim, TileRim, DangerText;
         public static Color PillBg, PillStroke, SwatchRing, LangPill, LangPillText, WinFg;
 
-        /// <summary>Switches the whole application to the dark, light or navy palette.</summary>
+        /// <summary>Switches the whole application to the dark, light, navy or CMS beta palette.</summary>
         public static void Apply(bool light)
         {
             Apply(light ? ThemeMode.Light : ThemeMode.Dark);
@@ -61,10 +61,19 @@ namespace HabboSiClient
             Mode = mode;
             if (mode == ThemeMode.Light) ApplyLight();
             else if (mode == ThemeMode.Navy) ApplyNavy();
+            else if (mode == ThemeMode.Beta) ApplyBeta();
             else ApplyDark();
 
-            Focus = Color.FromArgb(190, 246, 196, 82);
-            GoldText = Color.FromArgb(26, 19, 5);
+            if (mode == ThemeMode.Beta)
+            {
+                Focus = Color.FromArgb(190, 120, 136, 92);
+                GoldText = Color.FromArgb(248, 250, 243);
+            }
+            else
+            {
+                Focus = Color.FromArgb(190, 246, 196, 82);
+                GoldText = Color.FromArgb(26, 19, 5);
+            }
             BuildChecker();
         }
 
@@ -180,6 +189,62 @@ namespace HabboSiClient
         }
 
         /// <summary>
+        /// Beta palette: the published habbo.si CMS shell, sampled from its stylesheet
+        /// (https://cdn.habbo.si/cms/assets/css/CLlpSoM3.css, 2026-11-08). The site is a warm
+        /// light canvas with white cards, zinc borders, Poppins type and an olive primary.
+        /// </summary>
+        static void ApplyBeta()
+        {
+            Light = true;
+
+            Bg1 = Color.FromArgb(245, 247, 251);      // --background
+            Bg2 = Bg1;
+            TitleBg = Bg1;
+            Card = Color.FromArgb(255, 255, 255);     // --card
+            CardTop = Card;
+            CardBot = Card;
+            Inset = Color.FromArgb(255, 255, 255);    // --input-bg
+            Segment = Color.FromArgb(236, 237, 240);  // --tertiary
+            Stroke = Color.FromArgb(228, 228, 231);   // --border
+            Line = Color.FromArgb(233, 236, 239);     // --card-border
+            LineSoft = Color.FromArgb(241, 243, 247);
+            Text = Color.FromArgb(59, 54, 48);        // --foreground
+            Muted = Color.FromArgb(109, 100, 88);     // --muted-foreground
+            Dim = Color.FromArgb(139, 133, 123);
+            Gold = Color.FromArgb(100, 116, 72);      // --primary-dark
+            GoldHi = Color.FromArgb(120, 136, 92);    // --primary-color
+            Hover = Color.FromArgb(236, 237, 240);
+            HoverSoft = Color.FromArgb(241, 243, 248);
+            Danger = Color.FromArgb(220, 38, 38);
+            Check1 = Color.FromArgb(238, 241, 246);
+            Check2 = Color.FromArgb(247, 249, 252);
+            Teal = Color.FromArgb(78, 148, 145);      // --quinary
+
+            StrokeHot = Color.FromArgb(207, 212, 220);
+            BtnText = Color.FromArgb(85, 79, 70);
+            IconIdle = Color.FromArgb(123, 117, 108);
+            ChipText = Color.FromArgb(95, 89, 79);
+            DotOff = Color.FromArgb(176, 170, 159);
+            TipBg = Color.FromArgb(255, 255, 255);
+            GridLine = Color.FromArgb(18, 59, 54, 48);
+            FrameLine = Color.FromArgb(201, 206, 216);
+            HoverOutline = Color.FromArgb(120, 59, 54, 48);
+            DashLine = Color.FromArgb(216, 221, 229);
+            ScrollBar = Color.FromArgb(198, 204, 214);
+            ToastBg = Color.FromArgb(250, 251, 253);
+            ToastText = Text;
+            Rim = Color.FromArgb(32, 0, 0, 0);
+            TileRim = Color.FromArgb(36, 0, 0, 0);
+            DangerText = Color.FromArgb(185, 28, 28);
+            PillBg = Color.FromArgb(238, 241, 233);
+            PillStroke = Color.FromArgb(179, 193, 165);
+            SwatchRing = Color.FromArgb(140, 59, 54, 48);
+            LangPill = Color.FromArgb(59, 54, 48);
+            LangPillText = Color.FromArgb(245, 247, 251);
+            WinFg = Color.FromArgb(109, 100, 88);
+        }
+
+        /// <summary>
         /// Navy palette: the dark theme's layout and density in deep blue. The window is a
         /// navy base, cards step up one navy tone and recesses drop one, so every panel and
         /// sheet stays readable without any lighting tricks.
@@ -236,7 +301,7 @@ namespace HabboSiClient
         }
 
         /// <summary>
-        /// Custom (beta) palette: the user picks a surface, an accent and a text colour and
+        /// Custom palette: the user picks a surface, an accent and a text colour and
         /// every other token is derived from those three, so all controls follow without
         /// per-theme special cases. Bright surfaces get the light-family derivations.
         /// </summary>
@@ -360,10 +425,11 @@ namespace HabboSiClient
             using (SolidBrush b = new SolidBrush(fallback)) g.FillRectangle(b, r);
         }
 
-        // Preview tones for the appearance picker, so all three palettes can be drawn at once.
+        // Preview tones for the appearance picker, so all four palettes can be drawn at once.
         public static Color MiniBg(ThemeMode m)
         {
             if (m == ThemeMode.Light) return Color.FromArgb(243, 245, 249);
+            if (m == ThemeMode.Beta) return Color.FromArgb(245, 247, 251);
             if (m == ThemeMode.Navy) return Color.FromArgb(9, 18, 34);
             if (m == ThemeMode.Custom)
                 return Mix(CustomSurface, Lum(CustomSurface) < 0.55f ? Color.Black : Color.White, 0.55f);
@@ -372,6 +438,7 @@ namespace HabboSiClient
         public static Color MiniCard(ThemeMode m)
         {
             if (m == ThemeMode.Light) return Color.FromArgb(255, 255, 255);
+            if (m == ThemeMode.Beta) return Color.FromArgb(255, 255, 255);
             if (m == ThemeMode.Navy) return Color.FromArgb(18, 33, 58);
             if (m == ThemeMode.Custom) return CustomSurface;
             return Color.FromArgb(23, 28, 34);
@@ -379,6 +446,7 @@ namespace HabboSiClient
         public static Color MiniStroke(ThemeMode m)
         {
             if (m == ThemeMode.Light) return Color.FromArgb(219, 225, 233);
+            if (m == ThemeMode.Beta) return Color.FromArgb(228, 228, 231);
             if (m == ThemeMode.Navy) return Color.FromArgb(52, 78, 116);
             if (m == ThemeMode.Custom)
                 return Mix(CustomSurface, Lum(CustomSurface) < 0.55f ? Color.White : Color.Black, 0.30f);
@@ -387,6 +455,7 @@ namespace HabboSiClient
         public static Color MiniText(ThemeMode m)
         {
             if (m == ThemeMode.Light) return Color.FromArgb(26, 32, 40);
+            if (m == ThemeMode.Beta) return Color.FromArgb(59, 54, 48);
             if (m == ThemeMode.Navy) return Color.FromArgb(230, 239, 252);
             if (m == ThemeMode.Custom) return CustomText;
             return Color.FromArgb(232, 237, 244);
@@ -394,6 +463,7 @@ namespace HabboSiClient
         public static Color MiniGold(ThemeMode m)
         {
             if (m == ThemeMode.Light) return Color.FromArgb(226, 158, 26);
+            if (m == ThemeMode.Beta) return Color.FromArgb(120, 136, 92);
             if (m == ThemeMode.Navy) return Color.FromArgb(246, 196, 82);
             if (m == ThemeMode.Custom) return CustomAccent;
             return Color.FromArgb(246, 196, 82);
@@ -1077,7 +1147,9 @@ namespace HabboSiClient
         {
             if (gold)
             {
-                Color fill = down ? Color.FromArgb(226, 176, 62) : (hot ? GoldHi : Gold);
+                Color fill = down
+                    ? (Mode == ThemeMode.Beta ? Mix(Gold, Color.Black, 0.12f) : Color.FromArgb(226, 176, 62))
+                    : (hot ? GoldHi : Gold);
                 FillRound(g, r, rad, fill);
                 return GoldText;
             }

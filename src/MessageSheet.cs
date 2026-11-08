@@ -11,7 +11,7 @@ namespace HabboSiClient
     /// <summary>
     /// The app's own message sheet. It replaces Windows' stock <see cref="MessageBox"/> for
     /// confirmations and error notes: the same rounded, borderless chrome as Settings, drawn only
-    /// from the active palette, so it fits Dark, Light and Navy. A confirmation can carry a small
+    /// from the active palette, so it fits every theme. A confirmation can carry a small
     /// path note (the profile folder, for example); Esc cancels, Enter confirms, and the X cancels.
     /// </summary>
     internal class MessageSheetForm : Form

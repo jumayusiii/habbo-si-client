@@ -10,7 +10,7 @@ namespace HabboSiClient
     /// <summary>
     /// Minimal Discord Rich Presence client speaking the local IPC protocol directly
     /// (\\.\pipe\discord-ipc-N) — no SDK, no extra files.
-    /// A free Discord application ID + an uploaded art asset are required by Discord.
+    /// A free Discord application ID is required by Discord; the artwork is an external HTTPS URL.
     /// </summary>
     internal static class DiscordRpc
     {
@@ -24,6 +24,9 @@ namespace HabboSiClient
 
         /// <summary>Hover text on the large artwork; carries the client name and version.</summary>
         public static readonly string LargeText = AppInfo.Name + " v" + AppInfo.Version + " — Game Client";
+
+        /// <summary>Public artwork URL; Discord fetches it, so no Developer Portal asset upload is needed.</summary>
+        public const string ArtworkUrl = "https://raw.githubusercontent.com/jumayusiii/habbo-si-client/main/assets/logo.png";
 
         const int OpHandshake = 0, OpFrame = 1, OpClose = 2, OpPing = 3, OpPong = 4;
 

@@ -887,7 +887,7 @@ return JSON.stringify({room:room,fiber:fiber,title:title,titleRoom:titleRoom});
             if (!settings.Discord) { DiscordRpc.Stop(); return; }
             string id = DiscordRpc.ResolveAppId(settings.DiscordAppId);
             if (!DiscordRpc.IsValidAppId(id)) { DiscordRpc.Stop(); return; }
-            DiscordRpc.Start(id, "logo");
+            DiscordRpc.Start(id, DiscordRpc.ArtworkUrl);
             UpdatePresence();
         }
 
