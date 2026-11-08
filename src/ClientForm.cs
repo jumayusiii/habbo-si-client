@@ -29,7 +29,10 @@ namespace HabboSiClient
         WinBtn wbMin, wbMax, wbClose;
         LinkChip chipReload, chipSettings;
         IconBtn zoomOut, zoomIn;
-        TagPill pill, betaPill;
+        TagPill pill;
+#if BETA
+        TagPill betaPill;
+#endif
         readonly ToolTip tips = new ToolTip();
 
         Rectangle rBar, rFooter, rContent, rZoom;
@@ -194,8 +197,9 @@ namespace HabboSiClient
             tips.SetToolTip(chipReload, ReloadTip());
             tips.SetToolTip(chipSettings, SettingsTip());
             tips.SetToolTip(pill, ClientTip());
-            if (betaPill != null)
-                tips.SetToolTip(betaPill, L.T("Beta channel build", "Beta-Kanal-Build"));
+#if BETA
+            tips.SetToolTip(betaPill, L.T("Beta channel build", "Beta-Kanal-Build"));
+#endif
 
             if (Program.ShotPath == null)
             {
@@ -224,7 +228,9 @@ namespace HabboSiClient
             chipReload.Visible = chipSettings.Visible = show;
             zoomIn.Visible = zoomOut.Visible = show;
             pill.Visible = show;
-            if (betaPill != null) betaPill.Visible = show;
+#if BETA
+            betaPill.Visible = show;
+#endif
             if (!show) return;
 
             int padR = T.P(10), bw = T.P(42), bh = T.P(30), by = (barH - bh) / 2;
@@ -256,11 +262,10 @@ namespace HabboSiClient
             int pillH = T.P(20);
             int pillX = T.P(22) + wmW + T.P(14);
             pill.SetBounds(pillX, (barH - pillH) / 2, pillW, pillH);
-            if (betaPill != null)
-            {
-                int betaW = T.Meas("BETA", T.FLabel).Width + T.P(14);
-                betaPill.SetBounds(pill.Right + T.P(7), (barH - pillH) / 2, betaW, pillH);
-            }
+#if BETA
+            int betaW = T.Meas("BETA", T.FLabel).Width + T.P(14);
+            betaPill.SetBounds(pill.Right + T.P(7), (barH - pillH) / 2, betaW, pillH);
+#endif
         }
 
         // ------------------------------------------------------------------ painting
@@ -637,8 +642,9 @@ namespace HabboSiClient
             tips.SetToolTip(chipReload, ReloadTip());
             tips.SetToolTip(chipSettings, SettingsTip());
             tips.SetToolTip(pill, ClientTip());
-            if (betaPill != null)
-                tips.SetToolTip(betaPill, L.T("Beta channel build", "Beta-Kanal-Build"));
+#if BETA
+            tips.SetToolTip(betaPill, L.T("Beta channel build", "Beta-Kanal-Build"));
+#endif
             if (web != null) web.DefaultBackgroundColor = T.Bg1;
             if (web != null) web.ZoomFactor = settings.Zoom;
         }
