@@ -181,13 +181,12 @@ namespace HabboSiClient
             pill.Interactive = true;
             Controls.Add(pill);
 
-            if (AppInfo.Beta)
-            {
-                betaPill = new TagPill();
-                betaPill.Caption = "BETA";
-                betaPill.Filled = true;
-                Controls.Add(betaPill);
-            }
+#if BETA
+            betaPill = new TagPill();
+            betaPill.Caption = "BETA";
+            betaPill.Filled = true;
+            Controls.Add(betaPill);
+#endif
 
             tips.InitialDelay = 420;
             tips.ReshowDelay = 120;
