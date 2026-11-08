@@ -375,7 +375,7 @@ namespace HabboSiClient
         async void CheckForUpdates()
         {
             UpdateInfo info = await Task.Run(() => UpdateCheck.Latest());
-            if (info == null || !UpdateCheck.IsNewer(info.Latest)) return;
+            if (!UpdateCheck.HasUpdate(info)) return;
             if (IsDisposed || !IsHandleCreated) return;
             try
             {
@@ -383,8 +383,8 @@ namespace HabboSiClient
                 {
                     if (IsDisposed) return;
                     string body = L.T(
-                        AppInfo.Name + " " + info.Latest + " is available. You are running " + AppInfo.Version + ".",
-                        AppInfo.Name + " " + info.Latest + " ist verfügbar. Du verwendest " + AppInfo.Version + ".");
+                        AppInfo.Name + " " + info.Display + " is available. You are running " + AppInfo.Version + ".",
+                        AppInfo.Name + " " + info.Display + " ist verfügbar. Du verwendest " + AppInfo.Version + ".");
                     bool open = MessageSheetForm.Notice(this,
                         L.T("Update available", "Update verfügbar"),
                         body, info.PageUrl,

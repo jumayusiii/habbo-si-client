@@ -62,7 +62,7 @@ namespace HabboSiClient
             get
             {
                 string root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                return Path.Combine(root, "HabboSiClient");
+                return Path.Combine(root, AppInfo.DataFolder);
             }
         }
 

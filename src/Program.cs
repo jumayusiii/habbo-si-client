@@ -87,9 +87,10 @@ namespace HabboSiClient
                 UpdateInfo info = UpdateCheck.Latest();
                 string text =
                     "running=" + AppInfo.Version + "\r\n" +
-                    "latest=" + (info != null ? info.Latest : "") + "\r\n" +
+                    "channel=" + (AppInfo.Beta ? "beta" : "stable") + "\r\n" +
+                    "latest=" + (info != null ? info.Display : "") + "\r\n" +
                     "page=" + (info != null ? info.PageUrl : "") + "\r\n" +
-                    "newer=" + (info != null && UpdateCheck.IsNewer(info.Latest)) + "\r\n" +
+                    "newer=" + UpdateCheck.HasUpdate(info) + "\r\n" +
                     "error=" + (info == null ? "no release or network" : "") + "\r\n";
                 File.WriteAllText(updatePath, text);
                 return;

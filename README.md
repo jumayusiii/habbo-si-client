@@ -47,6 +47,18 @@ Output: `dist/Habbo.si Client.exe` plus the three WebView2 files it needs beside
 (`Microsoft.Web.WebView2.Core.dll`, `Microsoft.Web.WebView2.WinForms.dll`, `WebView2Loader.dll`).
 The build copies them automatically — keep the four files together.
 
+### Beta channel
+
+```
+./build.sh beta
+```
+
+compiles the same sources with the `BETA` define and writes
+`dist/beta/Habbo.si Client Beta.exe`. That build calls itself **Habbo.si Client Beta**, keeps its
+own `%LOCALAPPDATA%\HabboSiClientBeta` profile and settings, and checks GitHub pre-releases
+instead of the latest stable release, so it can be installed and signed in next to the stable
+client.
+
 ## First start
 
 The client opens `https://habbo.si/client`. A fresh WebView2 profile has no session, so the
