@@ -29,7 +29,7 @@ namespace HabboSiClient
         WinBtn wbMin, wbMax, wbClose;
         LinkChip chipReload, chipSettings;
         IconBtn zoomOut, zoomIn;
-        TagPill pill;
+        TagPill pill, betaPill;
         readonly ToolTip tips = new ToolTip();
 
         Rectangle rBar, rFooter, rContent, rZoom;
@@ -181,12 +181,22 @@ namespace HabboSiClient
             pill.Interactive = true;
             Controls.Add(pill);
 
+            if (AppInfo.Beta)
+            {
+                betaPill = new TagPill();
+                betaPill.Caption = "BETA";
+                betaPill.Filled = true;
+                Controls.Add(betaPill);
+            }
+
             tips.InitialDelay = 420;
             tips.ReshowDelay = 120;
             tips.AutoPopDelay = 8000;
             tips.SetToolTip(chipReload, ReloadTip());
             tips.SetToolTip(chipSettings, SettingsTip());
             tips.SetToolTip(pill, ClientTip());
+            if (betaPill != null)
+                tips.SetToolTip(betaPill, L.T("Beta channel build", "Beta-Kanal-Build"));
 
             if (Program.ShotPath == null)
             {
@@ -215,6 +225,7 @@ namespace HabboSiClient
             chipReload.Visible = chipSettings.Visible = show;
             zoomIn.Visible = zoomOut.Visible = show;
             pill.Visible = show;
+            if (betaPill != null) betaPill.Visible = show;
             if (!show) return;
 
             int padR = T.P(10), bw = T.P(42), bh = T.P(30), by = (barH - bh) / 2;
@@ -244,7 +255,13 @@ namespace HabboSiClient
             int wmW = T.Wordmark != null ? T.P(T.Wordmark.Width) : 0;
             int pillW = T.Meas("CLIENT", T.FLabel).Width + T.P(18);
             int pillH = T.P(20);
-            pill.SetBounds(T.P(22) + wmW + T.P(14), (barH - pillH) / 2, pillW, pillH);
+            int pillX = T.P(22) + wmW + T.P(14);
+            pill.SetBounds(pillX, (barH - pillH) / 2, pillW, pillH);
+            if (betaPill != null)
+            {
+                int betaW = T.Meas("BETA", T.FLabel).Width + T.P(14);
+                betaPill.SetBounds(pill.Right + T.P(7), (barH - pillH) / 2, betaW, pillH);
+            }
         }
 
         // ------------------------------------------------------------------ painting
@@ -621,6 +638,8 @@ namespace HabboSiClient
             tips.SetToolTip(chipReload, ReloadTip());
             tips.SetToolTip(chipSettings, SettingsTip());
             tips.SetToolTip(pill, ClientTip());
+            if (betaPill != null)
+                tips.SetToolTip(betaPill, L.T("Beta channel build", "Beta-Kanal-Build"));
             if (web != null) web.DefaultBackgroundColor = T.Bg1;
             if (web != null) web.ZoomFactor = settings.Zoom;
         }

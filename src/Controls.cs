@@ -258,6 +258,8 @@ namespace HabboSiClient
     internal class TagPill : Control
     {
         public string Caption = "CLIENT";
+        /// <summary>Filled pills use the accent as background — the beta channel badge.</summary>
+        public bool Filled;
         bool hot, interactive;
 
         /// <summary>Header pills light up and take the hand cursor; plain tags stay flat.</summary>
@@ -284,6 +286,12 @@ namespace HabboSiClient
             // A capsule that hugs its label: the control is sized from the text in LayoutAll.
             RectangleF r = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
             float radius = Height / 2f;
+            if (Filled)
+            {
+                T.FillRound(g, r, radius, T.Gold);
+                T.Str(g, Caption, T.FLabel, T.GoldText, ClientRectangle, T.FC);
+                return;
+            }
             bool live = interactive && hot;
             T.FillRound(g, r, radius, Color.FromArgb(live ? 44 : 26, T.Gold));
             T.StrokeRound(g, r, radius, live ? T.GoldHi : T.Gold, live ? 1.4f : 1f);

@@ -57,7 +57,7 @@ compiles the same sources with the `BETA` define and writes
 `dist/beta/Habbo.si Client Beta.exe`. That build calls itself **Habbo.si Client Beta**, keeps its
 own `%LOCALAPPDATA%\HabboSiClientBeta` profile and settings, and checks GitHub pre-releases
 instead of the latest stable release, so it can be installed and signed in next to the stable
-client.
+client. Beta builds also carry a filled **BETA** badge beside the `CLIENT` pill.
 
 ## First start
 

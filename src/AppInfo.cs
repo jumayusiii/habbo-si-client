@@ -7,7 +7,7 @@ namespace HabboSiClient
         /// <summary>Beta builds are labelled, profiled and updated separately from stable.</summary>
         public const bool Beta = true;
         public const string Name = "Habbo.si Client Beta";
-        public const string Version = "1.1.5-beta.2";
+        public const string Version = "1.2.0-beta.1";
         public const string DataFolder = "HabboSiClientBeta";
 #else
         public const bool Beta = false;
