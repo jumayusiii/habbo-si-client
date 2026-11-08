@@ -223,7 +223,9 @@ namespace HabboSiClient
             int chipH = T.P(28), cy = (barH - chipH) / 2, langW = T.P(74);
             langSwitch.SetBounds(wbMin.Left - T.P(12) - langW, cy, langW, chipH);
 
-            int setW = T.Meas(chipSettings.Label, T.FChip).Width + T.P(40);
+            // The Settings chip carries the browser-status dot; reserve its full width so the
+            // label always ends before the dot, even when the status changes after layout.
+            int setW = T.Meas(chipSettings.Label, T.FChip).Width + T.P(55);
             chipSettings.SetBounds(langSwitch.Left - T.P(8) - setW, cy, setW, chipH);
 
             int relW = T.Meas(chipReload.Label, T.FChip).Width + T.P(40);

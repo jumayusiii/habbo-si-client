@@ -88,7 +88,6 @@ namespace HabboSiClient
                 string mode = Str(json, "theme");
                 if (mode == "light") s.Mode = ThemeMode.Light;
                 else if (mode == "navy") s.Mode = ThemeMode.Navy;
-                else if (mode == "beta") s.Mode = ThemeMode.Beta;
                 else if (mode == "custom") s.Mode = ThemeMode.Custom;
                 else s.Mode = ThemeMode.Dark;
 
@@ -146,7 +145,6 @@ namespace HabboSiClient
         {
             if (m == ThemeMode.Light) return "light";
             if (m == ThemeMode.Navy) return "navy";
-            if (m == ThemeMode.Beta) return "beta";
             if (m == ThemeMode.Custom) return "custom";
             return "dark";
         }

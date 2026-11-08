@@ -219,7 +219,17 @@ namespace HabboSiClient
     {
         public string Label = "Settings";
         public string Icon = "gear";
-        public int Status;   // 0 hidden, 1 waiting, 2 connected, 3 error
+        int status;
+        public int Status   // 0 hidden, 1 waiting, 2 connected, 3 error
+        {
+            get { return status; }
+            set
+            {
+                if (status == value) return;
+                status = value;
+                Invalidate();
+            }
+        }
         bool hot;
 
         public LinkChip()
@@ -385,10 +395,9 @@ namespace HabboSiClient
             Color lc = Selected ? T.Gold : (hot ? T.Text : T.Muted);
             string label = Mode == ThemeMode.Light ? L.T("Light", "Hell")
                 : Mode == ThemeMode.Navy ? L.T("Navy", "Marineblau")
-                : Mode == ThemeMode.Beta ? L.T("Beta", "Beta")
                 : L.T("Dark", "Dunkel");
             float ic = T.F(12f);
-            string icon = Mode == ThemeMode.Dark || Mode == ThemeMode.Navy ? "moon" : "sun";
+            string icon = Mode == ThemeMode.Light ? "sun" : "moon";
             T.Icon(g, icon, new RectangleF(T.P(11), ly + (T.P(16) - ic) / 2f, ic, ic), lc);
             int lx = T.P(11) + (int)ic + T.P(7);
             T.StrEll(g, label, T.FBtn, lc, new Rectangle(lx, ly, Math.Max(T.P(34), Width - lx - T.P(26)), T.P(16)), T.FL);

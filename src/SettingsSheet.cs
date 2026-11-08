@@ -14,7 +14,7 @@ namespace HabboSiClient
         readonly ClientSettings working;
         readonly CoreWebView2 core;
 
-        ThemeTile tDark, tLight, tNavy, tBeta;
+        ThemeTile tDark, tLight, tNavy;
         ToggleRow rowGpu, rowThrottle, rowFps, rowDev, rowDiscord;
         FieldBox fieldAppId;
         FlatBtn btnFolder, btnCache, btnPortal, btnCancel, btnSave;
@@ -73,8 +73,7 @@ namespace HabboSiClient
             tDark = new ThemeTile(); tDark.Mode = ThemeMode.Dark;
             tLight = new ThemeTile(); tLight.Mode = ThemeMode.Light;
             tNavy = new ThemeTile(); tNavy.Mode = ThemeMode.Navy;
-            tBeta = new ThemeTile(); tBeta.Mode = ThemeMode.Beta;
-            ThemeTile[] tiles = new ThemeTile[] { tDark, tLight, tNavy, tBeta };
+            ThemeTile[] tiles = new ThemeTile[] { tDark, tLight, tNavy };
             foreach (ThemeTile t in tiles)
             {
                 t.Selected = t.Mode == working.Mode;
@@ -181,8 +180,7 @@ namespace HabboSiClient
             tDark.Selected = mode == ThemeMode.Dark;
             tLight.Selected = mode == ThemeMode.Light;
             tNavy.Selected = mode == ThemeMode.Navy;
-            tBeta.Selected = mode == ThemeMode.Beta;
-            foreach (ThemeTile t in new ThemeTile[] { tDark, tLight, tNavy, tBeta }) t.Invalidate();
+            foreach (ThemeTile t in new ThemeTile[] { tDark, tLight, tNavy }) t.Invalidate();
 
             // preview the palette on the sheet and on the window behind it; Cancel puts it back
             T.Apply(mode);
@@ -333,11 +331,10 @@ namespace HabboSiClient
 
             rTiles = new Rectangle(pad, y, leftW, T.P(96));
             int tileGap = T.P(10);
-            int tw = (leftW - tileGap * 3) / 4;
+            int tw = (leftW - tileGap * 2) / 3;
             tDark.SetBounds(rTiles.X, y, tw, rTiles.Height);
             tLight.SetBounds(tDark.Right + tileGap, y, tw, rTiles.Height);
             tNavy.SetBounds(tLight.Right + tileGap, y, tw, rTiles.Height);
-            tBeta.SetBounds(tNavy.Right + tileGap, y, tw, rTiles.Height);
             y += rTiles.Height + T.P(18);
 
             rPerfLabel = new Rectangle(pad, y, leftW, T.P(18));

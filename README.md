@@ -66,8 +66,7 @@ session if you want to switch accounts.
 - **Session reload** — `F5` reloads the client without touching your window size or zoom.
 - **Zoom** — `−` / `+` in the app bar or `Ctrl` `+` / `−` / `0`; 50 %–200 %, remembered.
 - **Fullscreen** — `F11` (or `Esc` to leave) drops the chrome for a clean client surface.
-- **Themes** — dark, light, navy and **Beta**, the palette sampled from the habbo.si CMS, chosen in
-  Settings and previewed live.
+- **Themes** — dark, light and navy palettes for the chrome, chosen in Settings and previewed live.
 - **Themed sheets** — Settings and the delete/confirm/notice sheets are drawn in the app's palette,
   never in stock Windows grey; they fade in and out.
 - **External links open in your browser** — Discord, help pages and anything outside `habbo.si`
@@ -92,8 +91,7 @@ session if you want to switch accounts.
 
 `Settings` in the app bar opens the themed sheet:
 
-- **Appearance** — dark, light, navy and Beta. Beta follows the habbo.si CMS shell: its warm light
-  canvas, white cards and olive primary. The sheet and the window behind it preview the palette;
+- **Appearance** — dark, light, navy. The sheet and the window behind it preview the palette;
   Cancel restores the previous one.
 - **Performance** — hardware acceleration and “keep running in the background” are renderer
   switches and need a restart (the sheet marks them). Show FPS and developer tools apply at once.
@@ -173,7 +171,6 @@ that UI code.
                                                     # write the SET_ACTIVITY payload and exit
 "distHabbo.si Client.exe" --probe room.json           # dump room/DOM diagnostics
 "dist\Habbo.si Client.exe" --theme light --nosplash # light chrome
-"dist\Habbo.si Client.exe" --theme beta --nosplash  # habbo.si CMS palette
 "dist\Habbo.si Client.exe" --lang de                # German chrome
 "dist\Habbo.si Client.exe" --scale 1.5              # fake a 150% layout
 ```
