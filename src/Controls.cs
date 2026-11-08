@@ -214,22 +214,11 @@ namespace HabboSiClient
         protected override void OnMouseLeave(EventArgs e) { hot = false; Invalidate(); base.OnMouseLeave(e); }
     }
 
-    /// <summary>App bar chip with an icon, a label and an optional status dot.</summary>
+    /// <summary>App bar chip with an icon and an optional label.</summary>
     internal class LinkChip : Control
     {
         public string Label = "Settings";
         public string Icon = "gear";
-        int status;
-        public int Status   // 0 hidden, 1 waiting, 2 connected, 3 error
-        {
-            get { return status; }
-            set
-            {
-                if (status == value) return;
-                status = value;
-                Invalidate();
-            }
-        }
         bool hot;
 
         public LinkChip()
@@ -248,27 +237,16 @@ namespace HabboSiClient
             g.SmoothingMode = SmoothingMode.AntiAlias;
             T.FillRound(g, new RectangleF(0f, 0f, Width, Height), T.F(7f), hot ? T.HoverSoft : T.Segment);
 
-            // A chip without a label is the icon-only variant: centre the glyph in the space
-            // left of the status dot and skip the text.
+            // A chip without a label is the icon-only variant: centre the glyph and skip the text.
             bool iconOnly = Label.Length == 0;
-            float dotZone = Status > 0 ? T.P(13f) : 0f;
             float ic = iconOnly ? T.F(15f) : T.F(11f);
-            float ix = iconOnly ? (Width - dotZone - ic) / 2f : T.P(10);
+            float ix = iconOnly ? (Width - ic) / 2f : T.P(10);
             T.Icon(g, Icon, new RectangleF(ix, (Height - ic) / 2f, ic, ic), hot ? T.GoldHi : T.Gold);
             if (!iconOnly)
             {
                 int tx = (int)Math.Round(ix + ic) + T.P(6);
-                int dotW = Status > 0 ? T.P(15) : 0;
                 T.Str(g, Label, T.FChip, hot ? T.Text : T.ChipText,
-                    new Rectangle(tx, 0, Width - tx - T.P(7) - dotW, Height), T.FL);
-            }
-
-            if (Status > 0)
-            {
-                Color dc = Status == 2 ? T.Teal : Status == 3 ? T.Danger : T.Gold;
-                float d = T.F(6f);
-                using (SolidBrush b = new SolidBrush(dc))
-                    g.FillEllipse(b, Width - T.P(11) - d, (Height - d) / 2f, d, d);
+                    new Rectangle(tx, 0, Width - tx - T.P(7), Height), T.FL);
             }
         }
 

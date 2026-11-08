@@ -18,7 +18,7 @@ namespace HabboSiClient
     {
         readonly MessageKind kind;
         readonly string title, body, detail;
-        readonly bool confirm;
+        readonly bool confirm, danger;
         readonly Image preview;
         readonly int bodyTop, bodyWidth, previewSize;
 
@@ -48,8 +48,17 @@ namespace HabboSiClient
                 f.ShowDialog(owner);
         }
 
+        /// <summary>Opens a themed note with a primary action next to Cancel.</summary>
+        public static bool Notice(IWin32Window owner, string title, string body, string detail,
+            string acceptLabel, string cancelLabel)
+        {
+            using (MessageSheetForm f = new MessageSheetForm(MessageKind.Info, title, body, detail,
+                       acceptLabel, cancelLabel, null, true, false))
+                return f.ShowDialog(owner) == DialogResult.OK;
+        }
+
         public MessageSheetForm(MessageKind kind, string title, string body, string detail,
-            string confirmLabel, string cancelLabel, Image preview, bool confirm)
+            string confirmLabel, string cancelLabel, Image preview, bool confirm, bool danger = true)
         {
             this.kind = kind;
             this.title = title ?? "";
@@ -57,6 +66,7 @@ namespace HabboSiClient
             this.detail = detail ?? "";
             this.preview = preview;
             this.confirm = confirm;
+            this.danger = danger;
 
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -102,8 +112,9 @@ namespace HabboSiClient
             confirmBtn.BackColor = BackColor;
             if (confirm)
             {
-                confirmBtn.Danger = true;
-                confirmBtn.Icon = "trash";
+                confirmBtn.Danger = danger;
+                confirmBtn.Primary = !danger;
+                confirmBtn.Icon = danger ? "trash" : "download";
             }
             else confirmBtn.Primary = true;
             confirmBtn.Click += delegate { Commit(); };

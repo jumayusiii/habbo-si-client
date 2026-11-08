@@ -224,8 +224,8 @@ namespace HabboSiClient
 
             int chipH = T.P(28), cy = (barH - chipH) / 2;
 
-            // Both app-bar chips are icon-only; Settings keeps room for the status dot.
-            int setW = T.P(40);
+            // Both app-bar chips are icon-only and share the same width.
+            int setW = T.P(32);
             chipSettings.SetBounds(wbMin.Left - T.P(12) - setW, cy, setW, chipH);
 
             // Icon-only: a square target that only lights up under the pointer.
@@ -362,7 +362,38 @@ namespace HabboSiClient
             base.OnShown(e);
             if (settings.Maximized) WindowState = FormWindowState.Maximized;
             if (Program.ShotPath != null) return;
+            // captures and diagnostics must stay deterministic, so no network check there
+            if (Program.SmokeLog == null && Program.ShotLive == null && Program.ProbePath == null)
+                CheckForUpdates();
             await InitWeb();
+        }
+
+        /// <summary>
+        /// One quiet GitHub lookup per launch. Nothing is downloaded here: a newer tag opens a
+        /// themed sheet whose action hands the release page to the default browser.
+        /// </summary>
+        async void CheckForUpdates()
+        {
+            UpdateInfo info = await Task.Run(() => UpdateCheck.Latest());
+            if (info == null || !UpdateCheck.IsNewer(info.Latest)) return;
+            if (IsDisposed || !IsHandleCreated) return;
+            try
+            {
+                BeginInvoke(new Action(delegate
+                {
+                    if (IsDisposed) return;
+                    string body = L.T(
+                        AppInfo.Name + " " + info.Latest + " is available. You are running " + AppInfo.Version + ".",
+                        AppInfo.Name + " " + info.Latest + " ist verfügbar. Du verwendest " + AppInfo.Version + ".");
+                    bool open = MessageSheetForm.Notice(this,
+                        L.T("Update available", "Update verfügbar"),
+                        body, info.PageUrl,
+                        L.T("Open release", "Release öffnen"),
+                        L.T("Later", "Später"));
+                    if (open) OpenExternal(info.PageUrl);
+                }));
+            }
+            catch { }
         }
 
         async Task InitWeb()
@@ -405,13 +436,11 @@ namespace HabboSiClient
                 clock.Restart();
                 core.Navigate(AppInfo.ClientUrl);
                 status = L.T("Loading hotel…", "Hotel wird geladen…");
-                chipSettings.Status = 1;
                 Invalidate();
             }
             catch (WebView2RuntimeNotFoundException)
             {
                 status = L.T("WebView2 runtime missing", "WebView2-Runtime fehlt");
-                chipSettings.Status = 3;
                 Invalidate();
                 MessageSheetForm.Error(this, L.T("WebView2 is missing", "WebView2 fehlt"),
                     L.T("This client renders the hotel with the Microsoft Edge WebView2 runtime, which is not installed on this PC.",
@@ -421,7 +450,6 @@ namespace HabboSiClient
             catch (Exception ex)
             {
                 status = L.T("Browser failed to start", "Browser konnte nicht starten");
-                chipSettings.Status = 3;
                 Invalidate();
                 MessageSheetForm.Error(this, L.T("The browser could not start", "Der Browser konnte nicht starten"),
                     ex.Message, Store.ProfileDir);
@@ -450,7 +478,6 @@ namespace HabboSiClient
             if (e.IsSuccess)
             {
                 status = L.T("Connected", "Verbunden");
-                chipSettings.Status = 2;
                 PollRoom();
                 if (Program.ProbePath != null) probeTimer.Start();
                 if (Program.SmokeLog != null && !smokeStarted)
@@ -467,7 +494,6 @@ namespace HabboSiClient
             else
             {
                 status = L.T("Connection failed", "Verbindung fehlgeschlagen");
-                chipSettings.Status = 3;
                 if (e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled &&
                     (DateTime.Now - lastErrorShown).TotalSeconds > 4)
                 {
@@ -508,7 +534,6 @@ namespace HabboSiClient
             if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited)
             {
                 status = L.T("Browser process stopped", "Browserprozess beendet");
-                chipSettings.Status = 3;
                 Invalidate();
             }
         }

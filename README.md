@@ -69,6 +69,8 @@ session if you want to switch accounts.
   and explain themselves in a tooltip.
 - **Version pill** — hover the `CLIENT` tag beside the wordmark for the client name, version and
   build date.
+- **Update check** — at launch the client reads the public GitHub releases feed and, if a newer
+  tag exists, offers its release page in the browser. It never downloads or installs anything.
 - **Zoom** — `−` / `+` in the app bar or `Ctrl` `+` / `−` / `0`; 50 %–200 %, remembered.
 - **Fullscreen** — `F11` (or `Esc` to leave) drops the chrome for a clean client surface.
 - **Themes** — dark, light and navy palettes for the chrome, chosen in Settings and previewed live.
@@ -137,8 +139,9 @@ A publisher can bake an ID into `DiscordRpc.BuiltInAppId` so users do not have t
 └─ WebView2\          Chromium profile: hotel login, localStorage, cached assets
 ```
 
-Delete that folder to reset the client completely. Nothing is uploaded by the client; the hotel's
-own connections are the only network traffic.
+Delete that folder to reset the client completely. Nothing is uploaded by the client. The hotel's
+own connections and one launch-time request to the public GitHub releases feed are the only
+network traffic; the update check sends no account data.
 
 ## Where the interface came from
 
@@ -179,6 +182,7 @@ that UI code.
                                                     # window capture with the hotel inside
 "dist\Habbo.si Client.exe" --presence-json presence.json
                                                     # write the SET_ACTIVITY payload and exit
+"dist\Habbo.si Client.exe" --update-check update.txt  # GitHub release lookup and exit
 "distHabbo.si Client.exe" --probe room.json           # dump room/DOM diagnostics
 "dist\Habbo.si Client.exe" --theme light --nosplash # light chrome
 "dist\Habbo.si Client.exe" --lang de                # German chrome
