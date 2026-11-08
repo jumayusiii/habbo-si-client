@@ -4,7 +4,7 @@ namespace HabboSiClient
     internal static class AppInfo
     {
         public const string Name = "Habbo.si Client";
-        public const string Version = "1.1.3";
+        public const string Version = "1.1.4";
 
         /// <summary>The page the client opens: the hotel's own client route.</summary>
         public const string ClientUrl = "https://habbo.si/client";

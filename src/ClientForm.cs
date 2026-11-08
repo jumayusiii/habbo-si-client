@@ -28,7 +28,6 @@ namespace HabboSiClient
         WinBtn wbMin, wbMax, wbClose;
         LinkChip chipReload, chipSettings;
         IconBtn zoomOut, zoomIn;
-        LangSwitch langSwitch;
         TagPill pill;
 
         Rectangle rBar, rFooter, rContent, rZoom;
@@ -38,7 +37,7 @@ namespace HabboSiClient
 
         string status = "";
         string toast = "";
-        bool loading, ready;
+        bool loading;
         float phase;
         int fps = -1;
         bool smokeStarted;
@@ -177,11 +176,6 @@ namespace HabboSiClient
             zoomIn.Click += delegate { ZoomBy(0.1f); };
             Controls.Add(zoomIn);
 
-            langSwitch = new LangSwitch();
-            langSwitch.German = L.De;
-            langSwitch.Changed += delegate { SetGerman(langSwitch.German); };
-            Controls.Add(langSwitch);
-
             pill = new TagPill();
             pill.Caption = "CLIENT";
             Controls.Add(pill);
@@ -212,7 +206,7 @@ namespace HabboSiClient
             wbMin.Visible = wbMax.Visible = wbClose.Visible = show;
             chipReload.Visible = chipSettings.Visible = show;
             zoomIn.Visible = zoomOut.Visible = show;
-            langSwitch.Visible = pill.Visible = show;
+            pill.Visible = show;
             if (!show) return;
 
             int padR = T.P(10), bw = T.P(42), bh = T.P(30), by = (barH - bh) / 2;
@@ -220,13 +214,12 @@ namespace HabboSiClient
             wbMax.SetBounds(wbClose.Left - bw, by, bw, bh);
             wbMin.SetBounds(wbMax.Left - bw, by, bw, bh);
 
-            int chipH = T.P(28), cy = (barH - chipH) / 2, langW = T.P(74);
-            langSwitch.SetBounds(wbMin.Left - T.P(12) - langW, cy, langW, chipH);
+            int chipH = T.P(28), cy = (barH - chipH) / 2;
 
             // The Settings chip carries the browser-status dot; reserve its full width so the
             // label always ends before the dot, even when the status changes after layout.
             int setW = T.Meas(chipSettings.Label, T.FChip).Width + T.P(55);
-            chipSettings.SetBounds(langSwitch.Left - T.P(8) - setW, cy, setW, chipH);
+            chipSettings.SetBounds(wbMin.Left - T.P(12) - setW, cy, setW, chipH);
 
             int relW = T.Meas(chipReload.Label, T.FChip).Width + T.P(40);
             chipReload.SetBounds(chipSettings.Left - T.P(8) - relW, cy, relW, chipH);
@@ -306,20 +299,8 @@ namespace HabboSiClient
 
             int pad = T.P(18);
             int y = rFooter.Y;
-            float d = T.F(6f);
-            Color dot = loading ? T.Gold : (ready ? T.Teal : T.Dim);
-            using (SolidBrush b = new SolidBrush(dot))
-                g.FillEllipse(b, pad, y + (rFooter.Height - d) / 2f, d, d);
-
-            int tx = pad + (int)d + T.P(8);
-            int statusW = T.P(230);
-            T.StrEll(g, status, T.FMicro, T.Muted, new Rectangle(tx, y, statusW, rFooter.Height), T.FL);
-
-            string url = core != null ? PrettyUrl(core.Source) : "habbo.si/client";
-            int ux = tx + statusW;
-            T.StrEll(g, url, T.FMicro, T.Dim, new Rectangle(ux, y, Math.Max(T.P(60), Width - ux - T.P(330)), rFooter.Height), T.FL);
-
             int right = Width - pad;
+
             if (toast.Length > 0)
             {
                 int tw = T.Meas(toast, T.FMicro).Width + T.P(18);
@@ -329,17 +310,20 @@ namespace HabboSiClient
                 right -= tw + T.P(12);
             }
 
+            string version = "v" + AppInfo.Version;
+            int vw = T.Meas(version, T.FMicro).Width;
+            int gap = T.P(8);
             if (settings.ShowFps)
             {
                 string f = fps >= 0 ? fps + " FPS" : "— FPS";
-                int fw = T.P(74);
+                int fw = T.Meas(f, T.FMicro).Width;
                 T.Str(g, f, T.FMicro, fps >= 60 ? T.Teal : (fps >= 0 ? T.Muted : T.Dim),
                     new Rectangle(right - fw, y, fw, rFooter.Height), T.FR);
-                right -= fw;
+                right -= fw + gap;
             }
 
-            T.Str(g, "v" + AppInfo.Version, T.FMicro, T.Dim,
-                new Rectangle(right - T.P(58), y, T.P(58), rFooter.Height), T.FR);
+            T.Str(g, version, T.FMicro, T.Dim,
+                new Rectangle(right - vw, y, vw, rFooter.Height), T.FR);
         }
 
         void DrawViewportPlaceholder(Graphics g)
@@ -363,15 +347,6 @@ namespace HabboSiClient
                 T.FSmall, T.Dim, new Rectangle(rContent.X, cy + T.P(20), rContent.Width, T.P(20)), T.FC);
         }
 
-        static string PrettyUrl(string src)
-        {
-            try
-            {
-                Uri u = new Uri(src);
-                return u.Authority + u.PathAndQuery.TrimEnd('/');
-            }
-            catch { return src ?? ""; }
-        }
 
         // ------------------------------------------------------------------ webview
         protected override async void OnShown(EventArgs e)
@@ -448,7 +423,6 @@ namespace HabboSiClient
         void OnNavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
         {
             loading = true;
-            ready = false;
             status = L.T("Loading hotel…", "Hotel wird geladen…");
             phase = -0.6f;
             anim.Start();
@@ -467,7 +441,6 @@ namespace HabboSiClient
 
             if (e.IsSuccess)
             {
-                ready = true;
                 status = L.T("Connected", "Verbunden");
                 chipSettings.Status = 2;
                 PollRoom();
@@ -485,7 +458,6 @@ namespace HabboSiClient
             }
             else
             {
-                ready = false;
                 status = L.T("Connection failed", "Verbindung fehlgeschlagen");
                 chipSettings.Status = 3;
                 if (e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled &&
@@ -591,16 +563,6 @@ namespace HabboSiClient
             Invalidate();
         }
 
-        void SetGerman(bool de)
-        {
-            L.De = de;
-            settings.German = de;
-            langSwitch.German = de;
-            ApplyChrome();
-            LayoutAll();
-            Invalidate(true);
-        }
-
         void OpenSettings()
         {
             using (SettingsSheet sheet = new SettingsSheet(settings, core))
@@ -609,6 +571,7 @@ namespace HabboSiClient
                 bool restart = sheet.BrowserArgsChanged;
                 bool discord = sheet.DiscordChanged;
                 settings = sheet.Result;
+                L.De = settings.German;
                 ApplyChrome();
                 LayoutAll();
                 Invalidate(true);
@@ -624,7 +587,6 @@ namespace HabboSiClient
             backColor(T.Bg1, this);
             chipReload.Label = L.T("Reload", "Neu laden");
             chipSettings.Label = L.T("Settings", "Einstellungen");
-            langSwitch.German = L.De;
             if (web != null) web.DefaultBackgroundColor = T.Bg1;
             if (web != null) web.ZoomFactor = settings.Zoom;
         }

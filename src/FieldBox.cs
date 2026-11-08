@@ -53,7 +53,7 @@ namespace HabboSiClient
         public void SetPlaceholder(string text)
         {
             Placeholder = text;
-            if (Box.Text.Length == 0) ShowPlaceholder();
+            if (Box.Text.Length == 0 || showingPh) ShowPlaceholder();
         }
 
         /// <summary>Repaints the embedded text box in the active palette.</summary>

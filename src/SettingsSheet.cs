@@ -20,14 +20,16 @@ namespace HabboSiClient
         FlatBtn btnFolder, btnCache, btnPortal, btnCancel, btnSave;
         WinBtn close;
         TagPill pill;
+        LangSwitch langSwitch;
 
-        Rectangle rHead, rFoot, rAppLabel, rPerfLabel, rTiles, rRows, rNote, rDiscLabel, rStatus, rHint, rHover;
+        Rectangle rHead, rFoot, rAppLabel, rPerfLabel, rTiles, rRows, rNote, rDiscLabel, rStatus;
         bool dragging;
         Point dragAt;
         readonly bool initialGpu, initialThrottle;
         readonly bool initialDiscord;
         readonly string initialAppId;
         readonly ThemeMode originalMode;
+        readonly bool originalGerman;
 
         /// <summary>The settings to apply when the sheet reports OK.</summary>
         public ClientSettings Result { get { return working; } }
@@ -50,6 +52,7 @@ namespace HabboSiClient
             initialDiscord = current.Discord;
             initialAppId = current.DiscordAppId ?? "";
             originalMode = current.Mode;
+            originalGerman = current.German;
 
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -152,6 +155,11 @@ namespace HabboSiClient
             close.Click += delegate { DialogResult = DialogResult.Cancel; Close(); };
             Controls.Add(close);
 
+            langSwitch = new LangSwitch();
+            langSwitch.German = working.German;
+            langSwitch.Changed += delegate { SetLanguage(langSwitch.German); };
+            Controls.Add(langSwitch);
+
             pill = new TagPill();
             pill.Caption = "SETTINGS";
             pill.BackColor = T.Bg1;
@@ -187,6 +195,39 @@ namespace HabboSiClient
             ApplyPalette();
             Invalidate(true);
             if (Owner != null) Owner.Invalidate(true);
+        }
+
+        void SetLanguage(bool de)
+        {
+            working.German = de;
+            L.De = de;
+
+            rowGpu.Label = L.T("Hardware acceleration", "Hardware-Beschleunigung");
+            rowGpu.Note = L.T("GPU rasterisation for the hotel renderer", "GPU-Rasterisierung für den Hotel-Renderer");
+            rowThrottle.Label = L.T("Keep running in the background", "Im Hintergrund weiterlaufen");
+            rowThrottle.Note = L.T("No timer throttling while the window is covered", "Kein Timer-Drosseln bei verdecktem Fenster");
+            rowFps.Label = L.T("Show FPS", "FPS anzeigen");
+            rowFps.Note = L.T("Frame rate readout in the footer", "Bildrate in der Fußzeile");
+            rowDev.Label = L.T("Developer tools", "Entwicklerwerkzeuge");
+            rowDev.Note = L.T("Open the inspector with F12", "Den Inspector mit F12 öffnen");
+            rowDiscord.Label = L.T("Discord Rich Presence", "Discord Rich Presence");
+            rowDiscord.Note = L.T("Big artwork, client version and your room",
+                "Großes Artwork, Version und dein Raum");
+            fieldAppId.SetPlaceholder(L.T("Discord application ID (17–20 digits)",
+                                          "Discord-Application-ID (17–20 Ziffern)"));
+            btnPortal.Label = L.T("Developer Portal", "Entwickler-Portal");
+            btnFolder.Label = L.T("Open profile folder", "Profilordner");
+            btnCache.Label = L.T("Clear cache", "Cache leeren");
+            btnCancel.Label = L.T("Cancel", "Abbrechen");
+            btnSave.Label = L.T("Save", "Speichern");
+
+            foreach (ToggleRow r in new ToggleRow[] { rowGpu, rowThrottle, rowFps, rowDev, rowDiscord })
+                r.Invalidate();
+            foreach (ThemeTile t in new ThemeTile[] { tDark, tLight, tNavy }) t.Invalidate();
+            foreach (FlatBtn b in new FlatBtn[] { btnPortal, btnFolder, btnCache, btnCancel, btnSave })
+                b.Invalidate();
+            fieldAppId.Invalidate();
+            Invalidate(true);
         }
 
         void ConfirmSave()
@@ -243,7 +284,11 @@ namespace HabboSiClient
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             DiscordRpc.Changed -= OnDiscordChanged;
-            if (DialogResult != DialogResult.OK) T.Apply(originalMode);
+            if (DialogResult != DialogResult.OK)
+            {
+                L.De = originalGerman;
+                T.Apply(originalMode);
+            }
             if (Owner != null) Owner.Invalidate(true);
             base.OnFormClosed(e);
         }
@@ -318,6 +363,8 @@ namespace HabboSiClient
             int pillH = T.P(20);
             pill.SetBounds(T.P(22) + wmW + T.P(14), (rHead.Height - pillH) / 2, pillW, pillH);
             close.SetBounds(w - T.P(10) - T.P(42), (rHead.Height - T.P(30)) / 2, T.P(42), T.P(30));
+            int langW = T.P(74), langH = T.P(28);
+            langSwitch.SetBounds(close.Left - T.P(12) - langW, (rHead.Height - langH) / 2, langW, langH);
 
             int gap = T.P(26);
             int leftW = T.P(470);
@@ -361,8 +408,6 @@ namespace HabboSiClient
             ry += T.P(24);
 
             btnPortal.SetBounds(rightX, ry, T.P(160), T.P(28));
-            rHint = new Rectangle(rightX, btnPortal.Bottom + T.P(18), rightW, T.P(16));
-            rHover = new Rectangle(rightX, rHint.Bottom + T.P(4), rightW, T.P(16));
 
             int bh = T.P(36);
             int by = rFoot.Y - T.P(16) - bh;
@@ -408,20 +453,6 @@ namespace HabboSiClient
             T.Str(g, DiscordStatus(), T.FMicro, T.Dim, rStatus, T.FL);
             using (SolidBrush dot = new SolidBrush(DiscordDot()))
                 g.FillEllipse(dot, rStatus.X - T.P(12), rStatus.Y + (rStatus.Height - T.P(6)) / 2, T.P(6), T.P(6));
-
-            int padF = T.P(18);
-            float d = T.F(6f);
-            using (SolidBrush dot = new SolidBrush(T.Gold))
-                g.FillEllipse(dot, padF, rFoot.Y + (rFoot.Height - d) / 2f, d, d);
-            T.Str(g, L.T("Settings", "Einstellungen"), T.FMicro, T.Muted,
-                new Rectangle(padF + (int)d + T.P(8), rFoot.Y, T.P(200), rFoot.Height), T.FL);
-            T.Str(g, "habbo.si/client", T.FMicro, T.Dim,
-                new Rectangle(padF + T.P(230), rFoot.Y, T.P(220), rFoot.Height), T.FL);
-            T.Str(g, "v" + AppInfo.Version, T.FMicro, T.Dim,
-                new Rectangle(Width - padF - T.P(58), rFoot.Y, T.P(58), rFoot.Height), T.FR);
-
-            T.Str(g, L.T("Big image hover text", "Hover-Text des großen Bildes"), T.FMicro, T.Dim, rHint, T.FL);
-            T.Str(g, DiscordRpc.LargeText, T.FMicro, T.Muted, rHover, T.FL);
 
             T.VLine(g, rDiscLabel.X - T.P(13), rHead.Bottom + T.P(18), rFoot.Y - T.P(16), T.LineSoft);
 
