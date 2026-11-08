@@ -15,7 +15,7 @@ namespace HabboSiClient
         readonly CoreWebView2 core;
 
         ThemeTile tDark, tLight, tNavy;
-        ToggleRow rowGpu, rowThrottle, rowFps, rowDev, rowDiscord;
+        ToggleRow rowGpu, rowUnlock, rowThrottle, rowFps, rowDev, rowDiscord;
         FieldBox fieldAppId;
         FlatBtn btnFolder, btnCache, btnPortal, btnCancel, btnSave;
         WinBtn close;
@@ -25,7 +25,7 @@ namespace HabboSiClient
         Rectangle rHead, rFoot, rAppLabel, rPerfLabel, rTiles, rRows, rNote, rDiscLabel, rStatus;
         bool dragging;
         Point dragAt;
-        readonly bool initialGpu, initialThrottle;
+        readonly bool initialGpu, initialUnlock, initialThrottle;
         readonly bool initialDiscord;
         readonly string initialAppId;
         readonly ThemeMode originalMode;
@@ -48,6 +48,7 @@ namespace HabboSiClient
             working = current.Clone();
             core = web;
             initialGpu = current.Gpu;
+            initialUnlock = current.UnlockFps;
             initialThrottle = current.NoThrottle;
             initialDiscord = current.Discord;
             initialAppId = current.DiscordAppId ?? "";
@@ -64,7 +65,7 @@ namespace HabboSiClient
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
             catch { }
 
-            ClientSize = new Size(T.P(900), T.P(580));
+            ClientSize = new Size(T.P(900), T.P(604));
             BuildUi();
             LayoutAll();
             SheetFade.Attach(this);
@@ -89,6 +90,12 @@ namespace HabboSiClient
                 working.Gpu);
             rowGpu.Restart = true;
             rowGpu.Changed += delegate { working.Gpu = rowGpu.On; MarkArgs(); };
+
+            rowUnlock = MakeRow(L.T("Unlock frame rate", "Bildrate freigeben"),
+                L.T("Uncapped renderer for 60–120 FPS", "Renderer ohne 60-FPS-Grenze"),
+                working.UnlockFps);
+            rowUnlock.Restart = true;
+            rowUnlock.Changed += delegate { working.UnlockFps = rowUnlock.On; MarkArgs(); };
 
             rowThrottle = MakeRow(L.T("Keep running in the background", "Im Hintergrund weiterlaufen"),
                 L.T("No timer throttling while the window is covered", "Kein Timer-Drosseln bei verdecktem Fenster"),
@@ -179,7 +186,8 @@ namespace HabboSiClient
         void MarkArgs()
         {
             // only a renderer switch needs a restart; the rest apply on the spot
-            BrowserArgsChanged = rowGpu.On != initialGpu || rowThrottle.On != initialThrottle;
+            BrowserArgsChanged = rowGpu.On != initialGpu || rowUnlock.On != initialUnlock ||
+                                 rowThrottle.On != initialThrottle;
         }
 
         void PickTheme(ThemeMode mode)
@@ -204,6 +212,8 @@ namespace HabboSiClient
 
             rowGpu.Label = L.T("Hardware acceleration", "Hardware-Beschleunigung");
             rowGpu.Note = L.T("GPU rasterisation for the hotel renderer", "GPU-Rasterisierung für den Hotel-Renderer");
+            rowUnlock.Label = L.T("Unlock frame rate", "Bildrate freigeben");
+            rowUnlock.Note = L.T("Uncapped renderer for 60–120 FPS", "Renderer ohne 60-FPS-Grenze");
             rowThrottle.Label = L.T("Keep running in the background", "Im Hintergrund weiterlaufen");
             rowThrottle.Note = L.T("No timer throttling while the window is covered", "Kein Timer-Drosseln bei verdecktem Fenster");
             rowFps.Label = L.T("Show FPS", "FPS anzeigen");
@@ -221,7 +231,7 @@ namespace HabboSiClient
             btnCancel.Label = L.T("Cancel", "Abbrechen");
             btnSave.Label = L.T("Save", "Speichern");
 
-            foreach (ToggleRow r in new ToggleRow[] { rowGpu, rowThrottle, rowFps, rowDev, rowDiscord })
+            foreach (ToggleRow r in new ToggleRow[] { rowGpu, rowUnlock, rowThrottle, rowFps, rowDev, rowDiscord })
                 r.Invalidate();
             foreach (ThemeTile t in new ThemeTile[] { tDark, tLight, tNavy }) t.Invalidate();
             foreach (FlatBtn b in new FlatBtn[] { btnPortal, btnFolder, btnCache, btnCancel, btnSave })
@@ -387,7 +397,7 @@ namespace HabboSiClient
             rPerfLabel = new Rectangle(pad, y, leftW, T.P(18));
             y += T.P(24);
 
-            ToggleRow[] rows = new ToggleRow[] { rowGpu, rowThrottle, rowFps, rowDev };
+            ToggleRow[] rows = new ToggleRow[] { rowGpu, rowUnlock, rowThrottle, rowFps, rowDev };
             rRows = new Rectangle(pad, y, leftW, rowH * rows.Length);
             for (int i = 0; i < rows.Length; i++)
                 rows[i].SetBounds(rRows.X, y + i * rowH, rRows.Width, rowH);

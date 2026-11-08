@@ -22,8 +22,8 @@ namespace HabboSiClient
         /// </summary>
         public const string BuiltInAppId = "";
 
-        /// <summary>Hover text on the large artwork; carries the client name and version.</summary>
-        public static readonly string LargeText = AppInfo.Name + " v" + AppInfo.Version + " — Game Client";
+        /// <summary>Hover text on the large artwork: the client name and version, nothing else.</summary>
+        public static readonly string LargeText = AppInfo.Name + " v" + AppInfo.Version;
 
         /// <summary>Public artwork URL; Discord fetches it, so no Developer Portal asset upload is needed.</summary>
         public const string ArtworkUrl = "https://raw.githubusercontent.com/jumayusiii/habbo-si-client/main/assets/logo.png";

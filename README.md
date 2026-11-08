@@ -62,8 +62,12 @@ session if you want to switch accounts.
 - **No background throttling** — when the window is covered, Chromium normally throttles timers and
   renderers; the client turns that off so the hotel keeps its connection and animations alive.
 - **FPS readout** — a one-line `requestAnimationFrame` counter is installed before the hotel's
-  scripts, polled once a second and shown in the footer (teal at 60+, muted below).
-- **Session reload** — `F5` reloads the client without touching your window size or zoom.
+  scripts, polled once a second and shown in the footer (teal at 60+).
+- **Unlocked frame pacing** — the renderer starts without Chromium's refresh-rate ceiling, so the
+  client can hold 60–120 FPS on a fast display instead of being pinned to a fixed step.
+- **Icon-only reload** — the app bar's arrow reloads the hotel; hover it for the shortcut.
+- **Version pill** — hover the `CLIENT` tag beside the wordmark for the client name, version and
+  build date.
 - **Zoom** — `−` / `+` in the app bar or `Ctrl` `+` / `−` / `0`; 50 %–200 %, remembered.
 - **Fullscreen** — `F11` (or `Esc` to leave) drops the chrome for a clean client surface.
 - **Themes** — dark, light and navy palettes for the chrome, chosen in Settings and previewed live.
@@ -71,7 +75,7 @@ session if you want to switch accounts.
   never in stock Windows grey; they fade in and out.
 - **External links open in your browser** — Discord, help pages and anything outside `habbo.si`
   leaves the client instead of hijacking it.
-- **Discord Rich Presence** — big client artwork, **Habbo.si Client v1.1.4 — Game Client** as its hover text,
+- **Discord Rich Presence** — big client artwork, **Habbo.si Client v1.1.5** as its hover text,
   and the room you are in as the activity line. Needs your own Discord application ID (below).
 - **Window state** — size, maximised state, theme, zoom and language are stored in
   `%LOCALAPPDATA%\HabboSiClient\settings.json`.
@@ -94,8 +98,9 @@ session if you want to switch accounts.
 - **Language** — switch the chrome between English and German.
 - **Appearance** — dark, light, navy. The sheet and the window behind it preview the palette;
   Cancel restores the previous one.
-- **Performance** — hardware acceleration and “keep running in the background” are renderer
-  switches and need a restart (the sheet marks them). Show FPS and developer tools apply at once.
+- **Performance** — hardware acceleration, “unlock frame rate” and “keep running in the
+  background” are renderer switches and need a restart (the sheet marks them). Show FPS and
+  developer tools apply at once.
 - **Profile** — open the WebView2 profile folder, or clear cached assets and the saved session.
 - **Discord** — Rich Presence on/off and the application ID. The dot shows whether the local
   Discord client is connected; the room line updates on its own.
@@ -111,7 +116,7 @@ from an app you control (it cannot ship someone else's):
 3. Copy the **Application ID** and paste it into *Settings → Discord*. The dot turns gold once the
    local Discord client answers.
 
-The activity shows the big artwork with **Habbo.si Client v1.1.4 — Game Client** on hover, and the line under it
+The activity shows the big artwork with **Habbo.si Client v1.1.5** on hover, and the line under it
 names the current room (`In Sunset Lounge`, or `In the hotel` before you enter one). Room names are
 read from the hotel client's room header and its page title, including inside frames; if the hotel
 exposes the room nowhere readable, the line stays on `In the hotel`.

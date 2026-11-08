@@ -248,13 +248,18 @@ namespace HabboSiClient
             g.SmoothingMode = SmoothingMode.AntiAlias;
             T.FillRound(g, new RectangleF(0f, 0f, Width, Height), T.F(7f), hot ? T.HoverSoft : T.Segment);
 
-            float ic = T.F(11f);
-            float ix = T.P(10);
+            // A chip without a label is the icon-only variant: centre the glyph and skip the text.
+            bool iconOnly = Label.Length == 0;
+            float ic = iconOnly ? T.F(13f) : T.F(11f);
+            float ix = iconOnly ? (Width - ic) / 2f : T.P(10);
             T.Icon(g, Icon, new RectangleF(ix, (Height - ic) / 2f, ic, ic), hot ? T.GoldHi : T.Gold);
-            int tx = (int)Math.Round(ix + ic) + T.P(6);
-            int dotW = Status > 0 ? T.P(15) : 0;
-            T.Str(g, Label, T.FChip, hot ? T.Text : T.ChipText,
-                new Rectangle(tx, 0, Width - tx - T.P(7) - dotW, Height), T.FL);
+            if (!iconOnly)
+            {
+                int tx = (int)Math.Round(ix + ic) + T.P(6);
+                int dotW = Status > 0 ? T.P(15) : 0;
+                T.Str(g, Label, T.FChip, hot ? T.Text : T.ChipText,
+                    new Rectangle(tx, 0, Width - tx - T.P(7) - dotW, Height), T.FL);
+            }
 
             if (Status > 0)
             {
@@ -273,6 +278,14 @@ namespace HabboSiClient
     internal class TagPill : Control
     {
         public string Caption = "CLIENT";
+        bool hot, interactive;
+
+        /// <summary>Header pills light up and take the hand cursor; plain tags stay flat.</summary>
+        public bool Interactive
+        {
+            get { return interactive; }
+            set { interactive = value; Cursor = value ? Cursors.Hand : Cursors.Default; }
+        }
 
         public TagPill()
         {
@@ -291,10 +304,14 @@ namespace HabboSiClient
             // A capsule that hugs its label: the control is sized from the text in LayoutAll.
             RectangleF r = new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f);
             float radius = Height / 2f;
-            T.FillRound(g, r, radius, Color.FromArgb(26, T.Gold));
-            T.StrokeRound(g, r, radius, T.Gold, 1f);
-            T.Str(g, Caption, T.FLabel, T.Gold, ClientRectangle, T.FC);
+            bool live = interactive && hot;
+            T.FillRound(g, r, radius, Color.FromArgb(live ? 44 : 26, T.Gold));
+            T.StrokeRound(g, r, radius, live ? T.GoldHi : T.Gold, live ? 1.4f : 1f);
+            T.Str(g, Caption, T.FLabel, live ? T.GoldHi : T.Gold, ClientRectangle, T.FC);
         }
+
+        protected override void OnMouseEnter(EventArgs e) { hot = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hot = false; Invalidate(); base.OnMouseLeave(e); }
     }
 
     /// <summary>EN | DE two-way language switch.</summary>

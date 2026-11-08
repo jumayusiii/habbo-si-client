@@ -15,6 +15,7 @@ namespace HabboSiClient
         public float Zoom = 1f;
         public bool Gpu = true;
         public bool NoThrottle = true;
+        public bool UnlockFps = true;
         public bool ShowFps = true;
         public bool DevTools;
         public bool Discord = true;
@@ -35,6 +36,7 @@ namespace HabboSiClient
             c.Zoom = Zoom;
             c.Gpu = Gpu;
             c.NoThrottle = NoThrottle;
+            c.UnlockFps = UnlockFps;
             c.ShowFps = ShowFps;
             c.DevTools = DevTools;
             c.Discord = Discord;
@@ -95,6 +97,7 @@ namespace HabboSiClient
                 s.Zoom = (float)Clamp(Num(json, "zoom", s.Zoom), 0.5, 2.0);
                 s.Gpu = Bool(json, "gpu", s.Gpu);
                 s.NoThrottle = Bool(json, "nothrottle", s.NoThrottle);
+                s.UnlockFps = Bool(json, "unlockfps", s.UnlockFps);
                 s.ShowFps = Bool(json, "showfps", s.ShowFps);
                 s.DevTools = Bool(json, "devtools", s.DevTools);
                 s.Discord = Bool(json, "discord", s.Discord);
@@ -125,6 +128,7 @@ namespace HabboSiClient
                 b.AppendLine("  \"zoom\": " + s.Zoom.ToString("0.00", CultureInfo.InvariantCulture) + ",");
                 b.AppendLine("  \"gpu\": " + (s.Gpu ? "true" : "false") + ",");
                 b.AppendLine("  \"nothrottle\": " + (s.NoThrottle ? "true" : "false") + ",");
+                b.AppendLine("  \"unlockfps\": " + (s.UnlockFps ? "true" : "false") + ",");
                 b.AppendLine("  \"showfps\": " + (s.ShowFps ? "true" : "false") + ",");
                 b.AppendLine("  \"devtools\": " + (s.DevTools ? "true" : "false") + ",");
                 b.AppendLine("  \"discord\": " + (s.Discord ? "true" : "false") + ",");

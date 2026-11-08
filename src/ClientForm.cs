@@ -29,6 +29,7 @@ namespace HabboSiClient
         LinkChip chipReload, chipSettings;
         IconBtn zoomOut, zoomIn;
         TagPill pill;
+        readonly ToolTip tips = new ToolTip();
 
         Rectangle rBar, rFooter, rContent, rZoom;
         bool fullscreen;
@@ -154,7 +155,6 @@ namespace HabboSiClient
 
             chipReload = new LinkChip();
             chipReload.Icon = "rotate";
-            chipReload.Label = L.T("Reload", "Neu laden");
             chipReload.Click += delegate { Reload(); };
             Controls.Add(chipReload);
 
@@ -178,7 +178,14 @@ namespace HabboSiClient
 
             pill = new TagPill();
             pill.Caption = "CLIENT";
+            pill.Interactive = true;
             Controls.Add(pill);
+
+            tips.InitialDelay = 420;
+            tips.ReshowDelay = 120;
+            tips.AutoPopDelay = 8000;
+            tips.SetToolTip(chipReload, ReloadTip());
+            tips.SetToolTip(pill, ClientTip());
 
             if (Program.ShotPath == null)
             {
@@ -221,7 +228,8 @@ namespace HabboSiClient
             int setW = T.Meas(chipSettings.Label, T.FChip).Width + T.P(55);
             chipSettings.SetBounds(wbMin.Left - T.P(12) - setW, cy, setW, chipH);
 
-            int relW = T.Meas(chipReload.Label, T.FChip).Width + T.P(40);
+            // Icon-only: a square target that only lights up under the pointer.
+            int relW = T.P(30);
             chipReload.SetBounds(chipSettings.Left - T.P(8) - relW, cy, relW, chipH);
 
             int b = T.P(26);
@@ -585,7 +593,8 @@ namespace HabboSiClient
         {
             T.Apply(settings.Mode);
             backColor(T.Bg1, this);
-            chipReload.Label = L.T("Reload", "Neu laden");
+            tips.SetToolTip(chipReload, ReloadTip());
+            tips.SetToolTip(pill, ClientTip());
             chipSettings.Label = L.T("Settings", "Einstellungen");
             if (web != null) web.DefaultBackgroundColor = T.Bg1;
             if (web != null) web.ZoomFactor = settings.Zoom;
@@ -595,6 +604,17 @@ namespace HabboSiClient
         {
             foreach (Control child in root.Controls) child.BackColor = c;
             root.BackColor = c;
+        }
+
+        static string ReloadTip()
+        {
+            return L.T("Reload (F5)", "Neu laden (F5)");
+        }
+
+        static string ClientTip()
+        {
+            return AppInfo.Name + " v" + AppInfo.Version + "\n" +
+                   L.T("Build date", "Build-Datum") + " " + AppInfo.BuildDate;
         }
 
         void ShowToast(string text)
@@ -836,12 +856,15 @@ var txt=(el.innerText||'').split('\n');
 for(var q=0;q<txt.length;q++){var t=ok(txt[q]);if(t){room=t;break;}}
 if(room)break;
 }}
-var fiber=fromFiber();
+var fiber='';
 try{if(!room){var g=window.Nitro||window.nitro;if(g){var ins=g.instance||g;var ss=ins.roomSession||(ins.roomSessionManager&&ins.roomSessionManager.getSession?ins.roomSessionManager.getSession(-1):null);if(ss)room=ok(ss.roomName||(ss.roomData&&ss.roomData.name)||'');}}}catch(e2){}
 try{if(!room&&window.GetNitroInstance){var ins2=window.GetNitroInstance();var ss2=ins2&&ins2.roomSessionManager&&ins2.roomSessionManager.getSession?ins2.roomSessionManager.getSession(-1):null;if(ss2)room=ok(ss2.roomName||(ss2.roomData&&ss2.roomData.name)||'');}}catch(e3){}
 var title=clean(document.title),titleRoom='';
 var m=title.match(/^(.*?)\s*(?:[-–—|·]\s*)(?:Habbo|Habbo\.si|Hotel|Nitro)(?:\s.*)?$/i);
 if(m&&m[1])titleRoom=ok(m[1]);
+// The cheap DOM and title checks answer for nearly every room; walking the React
+// fiber tree is only the fallback, so a poll no longer costs a full tree scan.
+if(!room)fiber=fromFiber();
 return JSON.stringify({room:room,fiber:fiber,title:title,titleRoom:titleRoom});
 }catch(e){return '';}})();";
 
@@ -1034,6 +1057,7 @@ return JSON.stringify(out);
             liveTimer.Stop();
             roomTimer.Stop();
             probeTimer.Stop();
+            tips.Dispose();
             DiscordRpc.Stop();
             try { if (web != null) web.Dispose(); } catch { }
             base.OnFormClosing(e);
