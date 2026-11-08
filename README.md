@@ -71,7 +71,7 @@ session if you want to switch accounts.
   never in stock Windows grey; they fade in and out.
 - **External links open in your browser** — Discord, help pages and anything outside `habbo.si`
   leaves the client instead of hijacking it.
-- **Discord Rich Presence** — big client artwork, **Habbo.si Client v1.1.2 — Game Client** as its hover text,
+- **Discord Rich Presence** — big client artwork, **Habbo.si Client v1.1.3 — Game Client** as its hover text,
   and the room you are in as the activity line. Needs your own Discord application ID (below).
 - **Window state** — size, maximised state, theme, zoom and language are stored in
   `%LOCALAPPDATA%\HabboSiClient\settings.json`.
@@ -110,7 +110,7 @@ from an app you control (it cannot ship someone else's):
 3. Copy the **Application ID** and paste it into *Settings → Discord*. The dot turns gold once the
    local Discord client answers.
 
-The activity shows the big artwork with **Habbo.si Client v1.1.2 — Game Client** on hover, and the line under it
+The activity shows the big artwork with **Habbo.si Client v1.1.3 — Game Client** on hover, and the line under it
 names the current room (`In Sunset Lounge`, or `In the hotel` before you enter one). Room names are
 read from the hotel client's room header and its page title, including inside frames; if the hotel
 exposes the room nowhere readable, the line stays on `In the hotel`.
