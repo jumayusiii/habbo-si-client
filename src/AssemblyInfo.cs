@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("Habbo.si Client Beta")]
 [assembly: AssemblyDescription("Beta channel build of the habbo.si desktop client")]
 [assembly: AssemblyProduct("Habbo.si Client Beta")]
-[assembly: AssemblyInformationalVersion("1.1.5-beta.1")]
+[assembly: AssemblyInformationalVersion("1.1.5-beta.2")]
 #else
 [assembly: AssemblyTitle("Habbo.si Client")]
 [assembly: AssemblyDescription("Lightweight desktop client for habbo.si")]

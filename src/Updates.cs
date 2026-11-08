@@ -56,20 +56,24 @@ namespace HabboSiClient
         {
             string json = Get(ReleasesUrl);
             if (json == null) return null;
+            UpdateInfo best = null;
             foreach (string release in Objects(json))
             {
                 if (BoolField(release, "draft") || !BoolField(release, "prerelease")) continue;
                 string tag = Field(release, "tag_name");
                 string page = Field(release, "html_url");
                 if (tag.Length == 0 || page.Length == 0) continue;
-                return new UpdateInfo
+                UpdateInfo info = new UpdateInfo
                 {
                     Latest = CleanTag(tag),
                     Tag = NormalizeTag(tag),
                     PageUrl = page
                 };
+                // The API's list order is not a version order, so compare instead of taking
+                // the first pre-release.
+                if (best == null || IsNewerBeta(info.Tag, best.Tag)) best = info;
             }
-            return null;
+            return best;
         }
 
         /// <summary>True when this channel's newest release is ahead of the running build.</summary>
