@@ -23,7 +23,7 @@ namespace HabboSiClient
         public const string BuiltInAppId = "";
 
         /// <summary>Hover text on the large artwork; carries the client name and version.</summary>
-        public static readonly string LargeText = "HabboSI Client — Game Client v" + AppInfo.Version;
+        public static readonly string LargeText = AppInfo.Name + " v" + AppInfo.Version + " — Game Client";
 
         const int OpHandshake = 0, OpFrame = 1, OpClose = 2, OpPing = 3, OpPong = 4;
 

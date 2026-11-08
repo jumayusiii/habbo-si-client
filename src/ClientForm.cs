@@ -119,7 +119,7 @@ namespace HabboSiClient
             smokeTimer.Interval = 1600;
             smokeTimer.Tick += delegate { smokeTimer.Stop(); FinishSmoke(); };
 
-            liveTimer.Interval = 4500;
+            liveTimer.Interval = 10000;
             liveTimer.Tick += delegate
             {
                 liveTimer.Stop();

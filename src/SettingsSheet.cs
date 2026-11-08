@@ -18,8 +18,9 @@ namespace HabboSiClient
         FieldBox fieldAppId;
         FlatBtn btnFolder, btnCache, btnPortal, btnCancel, btnSave;
         WinBtn close;
+        TagPill pill;
 
-        Rectangle rHead, rAppLabel, rPerfLabel, rTiles, rRows, rNote, rDiscLabel, rStatus;
+        Rectangle rHead, rFoot, rAppLabel, rPerfLabel, rTiles, rRows, rNote, rDiscLabel, rStatus, rHint, rHover;
         bool dragging;
         Point dragAt;
         readonly bool initialGpu, initialThrottle;
@@ -54,12 +55,12 @@ namespace HabboSiClient
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
-            BackColor = T.Card;
+            BackColor = T.Bg1;
             KeyPreview = true;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
             catch { }
 
-            ClientSize = new Size(T.P(560), T.P(676));
+            ClientSize = new Size(T.P(900), T.P(580));
             BuildUi();
             LayoutAll();
             SheetFade.Attach(this);
@@ -102,8 +103,8 @@ namespace HabboSiClient
             rowDev.Changed += delegate { working.DevTools = rowDev.On; };
 
             rowDiscord = MakeRow(L.T("Discord Rich Presence", "Discord Rich Presence"),
-                L.T("Big artwork with the client version, and the room you are in",
-                    "Großes Artwork mit Client-Version und deinem Raum"),
+                L.T("Big artwork, client version and your room",
+                    "Großes Artwork, Version und dein Raum"),
                 working.Discord);
             rowDiscord.Changed += delegate { working.Discord = rowDiscord.On; Invalidate(); };
 
@@ -146,8 +147,14 @@ namespace HabboSiClient
 
             close = new WinBtn();
             close.Icon = "close";
+            close.BackColor = T.Bg1;
             close.Click += delegate { DialogResult = DialogResult.Cancel; Close(); };
             Controls.Add(close);
+
+            pill = new TagPill();
+            pill.Caption = "SETTINGS";
+            pill.BackColor = T.Bg1;
+            Controls.Add(pill);
         }
 
         ToggleRow MakeRow(string label, string note, bool on)
@@ -226,8 +233,8 @@ namespace HabboSiClient
 
         void ApplyPalette()
         {
-            BackColor = T.Card;
-            foreach (Control c in Controls) c.BackColor = T.Card;
+            BackColor = T.Bg1;
+            foreach (Control c in Controls) c.BackColor = T.Bg1;
             fieldAppId.ApplyTheme();
             Invalidate(true);
         }
@@ -285,72 +292,93 @@ namespace HabboSiClient
         {
             int pad = T.P(22);
             int w = ClientSize.Width;
-            rHead = new Rectangle(0, 0, w, T.P(52));
+            int h = ClientSize.Height;
+            rHead = new Rectangle(0, 0, w, T.P(64));
+            rFoot = new Rectangle(0, h - T.P(30), w, T.P(30));
 
-            close.SetBounds(w - T.P(12) - T.P(40), T.P(10), T.P(40), T.P(30));
+            int wmW = T.Wordmark != null ? T.P(T.Wordmark.Width) : 0;
+            int pillW = T.Meas("SETTINGS", T.FLabel).Width + T.P(18);
+            int pillH = T.P(20);
+            pill.SetBounds(T.P(22) + wmW + T.P(14), (rHead.Height - pillH) / 2, pillW, pillH);
+            close.SetBounds(w - T.P(10) - T.P(42), (rHead.Height - T.P(30)) / 2, T.P(42), T.P(30));
 
-            int y = rHead.Bottom + T.P(6);
-            rAppLabel = new Rectangle(pad, y, w - pad * 2, T.P(18));
-            y += T.P(24);
-
-            int gap = T.P(10);
-            int tw = (w - pad * 2 - gap * 2) / 3;
-            rTiles = new Rectangle(pad, y, w - pad * 2, T.P(94));
-            tDark.SetBounds(rTiles.X, y, tw, rTiles.Height);
-            tLight.SetBounds(tDark.Right + gap, y, tw, rTiles.Height);
-            tNavy.SetBounds(tLight.Right + gap, y, tw, rTiles.Height);
-            y += rTiles.Height + T.P(16);
-
-            rPerfLabel = new Rectangle(pad, y, w - pad * 2, T.P(18));
-            y += T.P(24);
-
+            int gap = T.P(26);
+            int leftW = T.P(470);
+            int rightX = pad + leftW + gap;
+            int rightW = w - pad - rightX;
             int rowH = T.P(44);
-            rRows = new Rectangle(pad, y, w - pad * 2, rowH * 4);
+
+            int y = rHead.Bottom + T.P(18);
+            rAppLabel = new Rectangle(pad, y, leftW, T.P(18));
+            y += T.P(24);
+
+            rTiles = new Rectangle(pad, y, leftW, T.P(96));
+            int tileGap = T.P(10);
+            int tw = (leftW - tileGap * 2) / 3;
+            tDark.SetBounds(rTiles.X, y, tw, rTiles.Height);
+            tLight.SetBounds(tDark.Right + tileGap, y, tw, rTiles.Height);
+            tNavy.SetBounds(tLight.Right + tileGap, y, tw, rTiles.Height);
+            y += rTiles.Height + T.P(18);
+
+            rPerfLabel = new Rectangle(pad, y, leftW, T.P(18));
+            y += T.P(24);
+
             ToggleRow[] rows = new ToggleRow[] { rowGpu, rowThrottle, rowFps, rowDev };
+            rRows = new Rectangle(pad, y, leftW, rowH * rows.Length);
             for (int i = 0; i < rows.Length; i++)
                 rows[i].SetBounds(rRows.X, y + i * rowH, rRows.Width, rowH);
-            y += rowH * 4 + T.P(4);
+            y += rRows.Height + T.P(6);
+            rNote = new Rectangle(pad, y, leftW, T.P(16));
 
-            rNote = new Rectangle(pad, y, w - pad * 2, T.P(16));
-            y += T.P(32);
+            int ry = rHead.Bottom + T.P(18);
+            rDiscLabel = new Rectangle(rightX, ry, rightW, T.P(18));
+            ry += T.P(24);
 
-            rDiscLabel = new Rectangle(pad, y, w - pad * 2, T.P(18));
-            y += T.P(22);
+            rowDiscord.SetBounds(rightX, ry, rightW, rowH);
+            ry += rowH + T.P(8);
 
-            rowDiscord.SetBounds(pad, y, w - pad * 2, rowH);
-            y += rowH + T.P(6);
+            fieldAppId.SetBounds(rightX, ry, rightW, T.P(36));
+            ry += T.P(42);
 
-            fieldAppId.SetBounds(pad, y, w - pad * 2, T.P(36));
-            y += T.P(42);
+            rStatus = new Rectangle(rightX + T.P(18), ry, rightW - T.P(18), T.P(16));
+            ry += T.P(24);
 
-            rStatus = new Rectangle(pad + T.P(18), y, w - pad * 2 - T.P(18), T.P(16));
-            y += T.P(24);
-
-            btnPortal.SetBounds(pad, y, T.P(160), T.P(28));
+            btnPortal.SetBounds(rightX, ry, T.P(160), T.P(28));
+            rHint = new Rectangle(rightX, btnPortal.Bottom + T.P(18), rightW, T.P(16));
+            rHover = new Rectangle(rightX, rHint.Bottom + T.P(4), rightW, T.P(16));
 
             int bh = T.P(36);
-            int by = ClientSize.Height - pad - bh;
+            int by = rFoot.Y - T.P(16) - bh;
             btnFolder.SetBounds(pad, by, T.P(150), bh);
             btnCache.SetBounds(btnFolder.Right + T.P(8), by, T.P(112), bh);
             btnSave.SetBounds(w - pad - T.P(96), by, T.P(96), bh);
             btnCancel.SetBounds(btnSave.Left - T.P(8) - T.P(96), by, T.P(96), bh);
 
-            ThemeTile[] all = new ThemeTile[] { tDark, tLight, tNavy };
-            foreach (ThemeTile t in all) { t.BackColor = T.Card; }
-            foreach (ToggleRow r in rows) r.BackColor = T.Card;
-            rowDiscord.BackColor = T.Card;
-            btnFolder.BackColor = btnCache.BackColor = btnPortal.BackColor = T.Card;
-            btnCancel.BackColor = btnSave.BackColor = T.Card;
+            foreach (Control c in Controls) if (c != fieldAppId) c.BackColor = T.Bg1;
+            fieldAppId.ApplyTheme();
+            Invalidate(true);
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
+            T.PaintBackdrop(g, ClientRectangle);
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            using (SolidBrush b = new SolidBrush(T.Card)) g.FillRectangle(b, ClientRectangle);
 
-            T.Str(g, L.T("Settings", "Einstellungen"), T.FPageTitle, T.Text,
-                new Rectangle(T.P(22), 0, Width - T.P(90), rHead.Height), T.FL);
+            if (T.Wordmark != null)
+            {
+                int wmH = T.P(T.Wordmark.Height);
+                int wmW = T.P(T.Wordmark.Width);
+                int wmY = rHead.Y + (rHead.Height - wmH) / 2;
+                float scale = T.P(1f);
+                bool whole = Math.Abs(scale - (float)Math.Round(scale)) < 0.01f;
+                g.InterpolationMode = whole ? InterpolationMode.NearestNeighbor : InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = whole ? PixelOffsetMode.Half : PixelOffsetMode.HighQuality;
+                g.DrawImage(T.Wordmark, new Rectangle(T.P(22), wmY, wmW, wmH));
+            }
+
+            T.HLine(g, 0, Width, rHead.Bottom - 1, T.LineSoft);
+            T.HLine(g, 0, Width, rFoot.Y, T.LineSoft);
 
             T.Str(g, L.T("APPEARANCE", "ERSCHEINUNGSBILD"), T.FLabel, T.Dim, rAppLabel, T.FL);
             T.Str(g, L.T("PERFORMANCE", "LEISTUNG"), T.FLabel, T.Dim, rPerfLabel, T.FL);
@@ -364,8 +392,21 @@ namespace HabboSiClient
             using (SolidBrush dot = new SolidBrush(DiscordDot()))
                 g.FillEllipse(dot, rStatus.X - T.P(12), rStatus.Y + (rStatus.Height - T.P(6)) / 2, T.P(6), T.P(6));
 
-            T.HLine(g, T.P(22), Width - T.P(22), rHead.Bottom, T.LineSoft);
-            T.HLine(g, T.P(22), Width - T.P(22), rRows.Bottom + T.P(2), T.LineSoft);
+            int padF = T.P(18);
+            float d = T.F(6f);
+            using (SolidBrush dot = new SolidBrush(T.Gold))
+                g.FillEllipse(dot, padF, rFoot.Y + (rFoot.Height - d) / 2f, d, d);
+            T.Str(g, L.T("Settings", "Einstellungen"), T.FMicro, T.Muted,
+                new Rectangle(padF + (int)d + T.P(8), rFoot.Y, T.P(200), rFoot.Height), T.FL);
+            T.Str(g, "habbo.si/client", T.FMicro, T.Dim,
+                new Rectangle(padF + T.P(230), rFoot.Y, T.P(220), rFoot.Height), T.FL);
+            T.Str(g, "v" + AppInfo.Version, T.FMicro, T.Dim,
+                new Rectangle(Width - padF - T.P(58), rFoot.Y, T.P(58), rFoot.Height), T.FR);
+
+            T.Str(g, L.T("Big image hover text", "Hover-Text des großen Bildes"), T.FMicro, T.Dim, rHint, T.FL);
+            T.Str(g, DiscordRpc.LargeText, T.FMicro, T.Muted, rHover, T.FL);
+
+            T.VLine(g, rDiscLabel.X - T.P(13), rHead.Bottom + T.P(18), rFoot.Y - T.P(16), T.LineSoft);
 
             using (GraphicsPath rim = T.Round(new RectangleF(0.5f, 0.5f, Width - 1f, Height - 1f), T.F(12f)))
             using (Pen pen = new Pen(T.Rim, 1f))
