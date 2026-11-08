@@ -1,0 +1,26 @@
+# build output
+dist/
+bin/
+obj/
+*.exe
+*.pdb
+*.dll
+*.zip
+*.7z
+
+# local test output and scratch scripts
+.probe/
+.freebuff/
+tmp/
+*.log
+
+# editors
+.vs/
+.vscode/
+*.user
+*.suo
+
+# OS clutter
+Thumbs.db
+desktop.ini
+.DS_Store
