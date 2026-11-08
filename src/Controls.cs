@@ -248,10 +248,12 @@ namespace HabboSiClient
             g.SmoothingMode = SmoothingMode.AntiAlias;
             T.FillRound(g, new RectangleF(0f, 0f, Width, Height), T.F(7f), hot ? T.HoverSoft : T.Segment);
 
-            // A chip without a label is the icon-only variant: centre the glyph and skip the text.
+            // A chip without a label is the icon-only variant: centre the glyph in the space
+            // left of the status dot and skip the text.
             bool iconOnly = Label.Length == 0;
-            float ic = iconOnly ? T.F(13f) : T.F(11f);
-            float ix = iconOnly ? (Width - ic) / 2f : T.P(10);
+            float dotZone = Status > 0 ? T.P(13f) : 0f;
+            float ic = iconOnly ? T.F(15f) : T.F(11f);
+            float ix = iconOnly ? (Width - dotZone - ic) / 2f : T.P(10);
             T.Icon(g, Icon, new RectangleF(ix, (Height - ic) / 2f, ic, ic), hot ? T.GoldHi : T.Gold);
             if (!iconOnly)
             {

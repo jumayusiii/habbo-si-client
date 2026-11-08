@@ -31,7 +31,7 @@ namespace HabboSiClient
         public static Color Bg1, Bg2, TitleBg, Card, CardTop, CardBot, Inset, Segment;
         public static Color Stroke, Focus, Line, LineSoft, Text, Muted, Dim;
         public static Color Gold, GoldHi, GoldText, Hover, HoverSoft, Danger;
-        public static Color Check1, Check2, Teal;
+        public static Color Check1, Check2, Teal, Green;
 
         /// <summary>
         /// Fixed red for the alpha markers. Deliberately not part of any palette: an alpha tool
@@ -101,6 +101,7 @@ namespace HabboSiClient
                 Check1 = Color.FromArgb(22, 27, 34);
                 Check2 = Color.FromArgb(14, 18, 23);
                 Teal = Color.FromArgb(79, 209, 197);
+                Green = Color.FromArgb(74, 222, 128);
 
                 StrokeHot = Color.FromArgb(58, 68, 82);
                 BtnText = Color.FromArgb(188, 199, 214);
@@ -153,6 +154,7 @@ namespace HabboSiClient
                 Check1 = Color.FromArgb(232, 237, 243);
                 Check2 = Color.FromArgb(250, 251, 253);
                 Teal = Color.FromArgb(26, 145, 131);
+                Green = Color.FromArgb(21, 150, 74);
 
                 StrokeHot = Color.FromArgb(186, 196, 210);
                 BtnText = Color.FromArgb(74, 86, 100);
@@ -210,6 +212,7 @@ namespace HabboSiClient
             Check1 = Color.FromArgb(16, 30, 52);
             Check2 = Color.FromArgb(11, 22, 40);
             Teal = Color.FromArgb(86, 206, 200);
+            Green = Color.FromArgb(92, 224, 148);
 
             StrokeHot = Color.FromArgb(56, 82, 120);
             BtnText = Color.FromArgb(188, 208, 232);
@@ -275,6 +278,7 @@ namespace HabboSiClient
             Check1 = Mix(Inset, toward, dark ? 0.09f : 0.03f);
             Check2 = Mix(Inset, away, dark ? 0.10f : 0.02f);
             Teal = Mix(accent, Color.White, 0.30f);
+            Green = dark ? Color.FromArgb(94, 224, 144) : Color.FromArgb(21, 140, 72);
 
             StrokeHot = Mix(surface, toward, dark ? 0.32f : 0.24f);
             BtnText = Mix(text, surface, 0.15f);
@@ -864,8 +868,22 @@ namespace HabboSiClient
                         g.FillEllipse(b, 11f, 13.6f, 2.2f, 2.2f);
                         break;
                     case "rotate":
-                        g.DrawArc(p, 4.4f, 4.4f, 15.2f, 15.2f, 40f, 265f);
-                        g.FillPolygon(b, new PointF[] { new PointF(16.4f, 2.4f), new PointF(21.4f, 5.6f), new PointF(16.2f, 8.4f) });
+                        {
+                            // Refresh: a bold ring with a wide filled head. The old hairline arc
+                            // and small nub collapsed into a dot at app-bar size.
+                            using (Pen q = new Pen(c, Math.Max(1.6f, pw * 1.3f)))
+                            {
+                                q.StartCap = LineCap.Round;
+                                q.EndCap = LineCap.Round;
+                                g.DrawArc(q, 5.0f, 5.0f, 14.0f, 14.0f, 40f, 270f);
+                            }
+                            g.FillPolygon(b, new PointF[]
+                            {
+                                new PointF(15.4f, 2.2f),
+                                new PointF(21.6f, 5.6f),
+                                new PointF(15.2f, 8.8f)
+                            });
+                        }
                         break;
                     case "eye":
                     case "eyeOff":
@@ -1003,20 +1021,24 @@ namespace HabboSiClient
                         g.FillPolygon(b, new PointF[] { new PointF(12f, 3.4f), new PointF(14.2f, 9.8f), new PointF(20.6f, 12f), new PointF(14.2f, 14.2f), new PointF(12f, 20.6f), new PointF(9.8f, 14.2f), new PointF(3.4f, 12f), new PointF(9.8f, 9.8f) });
                         break;
                     case "gear":
-                        using (Pen q = new Pen(c, Math.Max(1.4f, pw * 1.1f)))
                         {
-                            q.StartCap = LineCap.Round;
-                            q.EndCap = LineCap.Round;
-                            for (int i = 0; i < 8; i++)
+                            // Modern cog: eight short round teeth, one thick ring, solid hub. Fewer
+                            // strokes than the old outline-in-outline gear, so it survives 15 px.
+                            using (Pen q = new Pen(c, Math.Max(1.7f, pw * 1.45f)))
                             {
-                                GraphicsState gs = g.Save();
-                                g.TranslateTransform(12f, 12f);
-                                g.RotateTransform(i * 45f);
-                                g.DrawLine(q, 0f, -7.4f, 0f, -10.2f);
-                                g.Restore(gs);
+                                q.StartCap = LineCap.Round;
+                                q.EndCap = LineCap.Round;
+                                for (int i = 0; i < 8; i++)
+                                {
+                                    GraphicsState gs = g.Save();
+                                    g.TranslateTransform(12f, 12f);
+                                    g.RotateTransform(i * 45f);
+                                    g.DrawLine(q, 0f, -6.2f, 0f, -9.4f);
+                                    g.Restore(gs);
+                                }
+                                g.DrawEllipse(q, 6.4f, 6.4f, 11.2f, 11.2f);
                             }
-                            g.DrawEllipse(q, 6.4f, 6.4f, 11.2f, 11.2f);
-                            g.DrawEllipse(q, 10.3f, 10.3f, 3.4f, 3.4f);
+                            g.FillEllipse(b, 10.5f, 10.5f, 3f, 3f);
                         }
                         break;
                     case "sun":

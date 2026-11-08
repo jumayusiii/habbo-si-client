@@ -7,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
@@ -160,7 +161,6 @@ namespace HabboSiClient
 
             chipSettings = new LinkChip();
             chipSettings.Icon = "gear";
-            chipSettings.Label = L.T("Settings", "Einstellungen");
             chipSettings.Click += delegate { OpenSettings(); };
             Controls.Add(chipSettings);
 
@@ -185,6 +185,7 @@ namespace HabboSiClient
             tips.ReshowDelay = 120;
             tips.AutoPopDelay = 8000;
             tips.SetToolTip(chipReload, ReloadTip());
+            tips.SetToolTip(chipSettings, SettingsTip());
             tips.SetToolTip(pill, ClientTip());
 
             if (Program.ShotPath == null)
@@ -223,13 +224,12 @@ namespace HabboSiClient
 
             int chipH = T.P(28), cy = (barH - chipH) / 2;
 
-            // The Settings chip carries the browser-status dot; reserve its full width so the
-            // label always ends before the dot, even when the status changes after layout.
-            int setW = T.Meas(chipSettings.Label, T.FChip).Width + T.P(55);
+            // Both app-bar chips are icon-only; Settings keeps room for the status dot.
+            int setW = T.P(40);
             chipSettings.SetBounds(wbMin.Left - T.P(12) - setW, cy, setW, chipH);
 
             // Icon-only: a square target that only lights up under the pointer.
-            int relW = T.P(30);
+            int relW = T.P(32);
             chipReload.SetBounds(chipSettings.Left - T.P(8) - relW, cy, relW, chipH);
 
             int b = T.P(26);
@@ -325,7 +325,7 @@ namespace HabboSiClient
             {
                 string f = fps >= 0 ? fps + " FPS" : "— FPS";
                 int fw = T.Meas(f, T.FMicro).Width;
-                T.Str(g, f, T.FMicro, fps >= 60 ? T.Teal : (fps >= 0 ? T.Muted : T.Dim),
+                T.Str(g, f, T.FMicro, fps >= 60 ? T.Green : (fps >= 0 ? T.Muted : T.Dim),
                     new Rectangle(right - fw, y, fw, rFooter.Height), T.FR);
                 right -= fw + gap;
             }
@@ -594,8 +594,8 @@ namespace HabboSiClient
             T.Apply(settings.Mode);
             backColor(T.Bg1, this);
             tips.SetToolTip(chipReload, ReloadTip());
+            tips.SetToolTip(chipSettings, SettingsTip());
             tips.SetToolTip(pill, ClientTip());
-            chipSettings.Label = L.T("Settings", "Einstellungen");
             if (web != null) web.DefaultBackgroundColor = T.Bg1;
             if (web != null) web.ZoomFactor = settings.Zoom;
         }
@@ -609,6 +609,11 @@ namespace HabboSiClient
         static string ReloadTip()
         {
             return L.T("Reload (F5)", "Neu laden (F5)");
+        }
+
+        static string SettingsTip()
+        {
+            return L.T("Settings", "Einstellungen");
         }
 
         static string ClientTip()
@@ -878,11 +883,36 @@ return JSON.stringify({room:room,fiber:fiber,title:title,titleRoom:titleRoom});
             UpdatePresence();
         }
 
+        internal const string PresenceState = "On habbo.si";
+
         void UpdatePresence()
         {
-            string room = currentRoom;
-            string details = !string.IsNullOrEmpty(room) ? "In " + room : "In the hotel";
-            DiscordRpc.SetActivity(details, "habbo.si");
+            DiscordRpc.SetActivity(PresenceDetails(currentRoom), PresenceState);
+        }
+
+        /// <summary>
+        /// The activity lines Discord shows. Sentence case throughout; the room keeps the hotel's
+        /// own spelling unless it arrives shouty or all lowercase, in which case it is title-cased
+        /// so the line never reads like a broken label. The state stays "On habbo.si" because the
+        /// domain is branded lowercase.
+        /// </summary>
+        internal static string PresenceDetails(string room)
+        {
+            room = PrettyRoom(room);
+            return room.Length == 0 ? "Exploring the hotel" : "Hanging out in " + room;
+        }
+
+        static string PrettyRoom(string room)
+        {
+            if (string.IsNullOrEmpty(room)) return "";
+            string s = Regex.Replace(room.Trim(), @"\s+", " ");
+            if (s.Length > 48) s = s.Substring(0, 47).TrimEnd() + "…";
+
+            string lower = s.ToLowerInvariant();
+            bool shouty = s == s.ToUpperInvariant() && s != lower;
+            bool flat = s == lower;
+            if (shouty || flat) s = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(lower);
+            return s;
         }
 
         void OnFrameCreated(object sender, CoreWebView2FrameCreatedEventArgs e)

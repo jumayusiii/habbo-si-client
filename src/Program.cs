@@ -74,7 +74,8 @@ namespace HabboSiClient
                 File.WriteAllText(presenceJson, DiscordRpc.BuildActivityJson(
                     Process.GetCurrentProcess().Id,
                     DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    "In Sunset Lounge", "habbo.si", DiscordRpc.ArtworkUrl,
+                    ClientForm.PresenceDetails("SUNSET LOUNGE"), ClientForm.PresenceState,
+                    DiscordRpc.ArtworkUrl,
                     DiscordRpc.LargeText));
                 return;
             }

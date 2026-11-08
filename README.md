@@ -62,10 +62,11 @@ session if you want to switch accounts.
 - **No background throttling** — when the window is covered, Chromium normally throttles timers and
   renderers; the client turns that off so the hotel keeps its connection and animations alive.
 - **FPS readout** — a one-line `requestAnimationFrame` counter is installed before the hotel's
-  scripts, polled once a second and shown in the footer (teal at 60+).
+  scripts, polled once a second and shown in the footer (green at 60+).
 - **Unlocked frame pacing** — the renderer starts without Chromium's refresh-rate ceiling, so the
   client can hold 60–120 FPS on a fast display instead of being pinned to a fixed step.
-- **Icon-only reload** — the app bar's arrow reloads the hotel; hover it for the shortcut.
+- **Icon-only app bar** — reload is an arrow and settings a sliders glyph; both light up under
+  the pointer and explain themselves in a tooltip.
 - **Version pill** — hover the `CLIENT` tag beside the wordmark for the client name, version and
   build date.
 - **Zoom** — `−` / `+` in the app bar or `Ctrl` `+` / `−` / `0`; 50 %–200 %, remembered.
@@ -93,7 +94,7 @@ session if you want to switch accounts.
 
 ## Settings
 
-`Settings` in the app bar opens the themed sheet:
+The sliders icon in the app bar opens the themed sheet:
 
 - **Language** — switch the chrome between English and German.
 - **Appearance** — dark, light, navy. The sheet and the window behind it preview the palette;
@@ -116,10 +117,13 @@ from an app you control (it cannot ship someone else's):
 3. Copy the **Application ID** and paste it into *Settings → Discord*. The dot turns gold once the
    local Discord client answers.
 
-The activity shows the big artwork with **Habbo.si Client v1.1.5** on hover, and the line under it
-names the current room (`In Sunset Lounge`, or `In the hotel` before you enter one). Room names are
-read from the hotel client's room header and its page title, including inside frames; if the hotel
-exposes the room nowhere readable, the line stays on `In the hotel`.
+The activity shows the big artwork with **Habbo.si Client v1.1.5** on hover. The two activity lines
+are sentence-cased: **Hanging out in Sunset Lounge** with **On habbo.si** beneath it, or
+**Exploring the hotel** before you enter a room. The domain stays lowercase because that is how the
+hotel brands it, while a room name that arrives in all caps or all lowercase is title-cased so the
+line never looks like a broken label. Room names are read from the hotel client's room header and
+its page title, including inside frames; if the hotel exposes the room nowhere readable, the line
+stays on `Exploring the hotel`.
 
 Presence talks to the installed Discord client over the local `\\.\pipe\discord-ipc-0…9` pipe.
 Nothing is uploaded, no token or password is read, and presence stops when the client closes.

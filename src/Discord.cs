@@ -306,8 +306,8 @@ namespace HabboSiClient
         {
             string d = detailsText;
             string s = stateText;
-            if (d == null || d.Length < 2) d = "In the hotel";
-            if (s == null || s.Length < 2) s = "habbo.si";
+            if (d == null || d.Length < 2) d = "Exploring the hotel";
+            if (s == null || s.Length < 2) s = "On habbo.si";
             WriteFrame(OpFrame, BuildActivityJson(Pid, startUnix, d, s, imageKey, LargeText));
             lastSend = DateTime.UtcNow;
             dirty = false;
