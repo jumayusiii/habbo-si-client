@@ -65,8 +65,8 @@ session if you want to switch accounts.
   scripts, polled once a second and shown in the footer (green at 60+).
 - **Unlocked frame pacing** — the renderer starts without Chromium's refresh-rate ceiling, so the
   client can hold 60–120 FPS on a fast display instead of being pinned to a fixed step.
-- **Icon-only app bar** — reload is an arrow and settings a sliders glyph; both light up under
-  the pointer and explain themselves in a tooltip.
+- **Icon-only app bar** — reload is an arrow and settings a cog; both light up under the pointer
+  and explain themselves in a tooltip.
 - **Version pill** — hover the `CLIENT` tag beside the wordmark for the client name, version and
   build date.
 - **Zoom** — `−` / `+` in the app bar or `Ctrl` `+` / `−` / `0`; 50 %–200 %, remembered.
@@ -94,7 +94,7 @@ session if you want to switch accounts.
 
 ## Settings
 
-The sliders icon in the app bar opens the themed sheet:
+The cog in the app bar opens the themed sheet:
 
 - **Language** — switch the chrome between English and German.
 - **Appearance** — dark, light, navy. The sheet and the window behind it preview the palette;
