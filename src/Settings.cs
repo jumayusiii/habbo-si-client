@@ -18,6 +18,10 @@ namespace HabboSiClient
         public bool UnlockFps = true;
         public bool ShowFps = true;
         public bool DevTools;
+        /// <summary>"stable" or "beta": which release feed the update check follows.</summary>
+        public string UpdateChannel = AppInfo.Beta ? "beta" : "stable";
+        /// <summary>The release whose What's new notes were last shown on this profile.</summary>
+        public string SeenRelease = "";
         public bool Discord = true;
         public string DiscordAppId = "";
         public int Width = 1360, Height = 860;
@@ -39,6 +43,8 @@ namespace HabboSiClient
             c.UnlockFps = UnlockFps;
             c.ShowFps = ShowFps;
             c.DevTools = DevTools;
+            c.UpdateChannel = UpdateChannel;
+            c.SeenRelease = SeenRelease;
             c.Discord = Discord;
             c.DiscordAppId = DiscordAppId;
             c.Width = Width;
@@ -57,10 +63,14 @@ namespace HabboSiClient
     /// </summary>
     internal static class Store
     {
+        /// <summary>Set by --data so captures and tests can use an isolated profile.</summary>
+        public static string OverrideDir;
+
         public static string Dir
         {
             get
             {
+                if (!string.IsNullOrEmpty(OverrideDir)) return OverrideDir;
                 string root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 return Path.Combine(root, AppInfo.DataFolder);
             }
@@ -100,6 +110,10 @@ namespace HabboSiClient
                 s.UnlockFps = Bool(json, "unlockfps", s.UnlockFps);
                 s.ShowFps = Bool(json, "showfps", s.ShowFps);
                 s.DevTools = Bool(json, "devtools", s.DevTools);
+                string channel = Str(json, "channel");
+                if (channel == "beta" || channel == "stable") s.UpdateChannel = channel;
+                string seen = Str(json, "seenrelease");
+                if (seen != null) s.SeenRelease = seen;
                 s.Discord = Bool(json, "discord", s.Discord);
                 string discordId = Str(json, "discordid");
                 if (discordId != null) s.DiscordAppId = discordId;
@@ -131,6 +145,8 @@ namespace HabboSiClient
                 b.AppendLine("  \"unlockfps\": " + (s.UnlockFps ? "true" : "false") + ",");
                 b.AppendLine("  \"showfps\": " + (s.ShowFps ? "true" : "false") + ",");
                 b.AppendLine("  \"devtools\": " + (s.DevTools ? "true" : "false") + ",");
+                b.AppendLine("  \"channel\": \"" + (s.UpdateChannel == "beta" ? "beta" : "stable") + "\",");
+                b.AppendLine("  \"seenrelease\": \"" + Escape(s.SeenRelease) + "\",");
                 b.AppendLine("  \"discord\": " + (s.Discord ? "true" : "false") + ",");
                 b.AppendLine("  \"discordid\": \"" + Escape(s.DiscordAppId) + "\",");
                 b.AppendLine("  \"width\": " + s.Width + ",");

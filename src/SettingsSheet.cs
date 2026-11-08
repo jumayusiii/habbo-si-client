@@ -15,14 +15,14 @@ namespace HabboSiClient
         readonly CoreWebView2 core;
 
         ThemeTile tDark, tLight, tNavy;
-        ToggleRow rowGpu, rowUnlock, rowThrottle, rowFps, rowDev, rowDiscord;
+        ToggleRow rowGpu, rowUnlock, rowThrottle, rowFps, rowDev, rowBeta, rowDiscord;
         FieldBox fieldAppId;
-        FlatBtn btnFolder, btnCache, btnPortal, btnCancel, btnSave;
+        FlatBtn btnFolder, btnCache, btnPortal, btnCancel, btnSave, btnNotes;
         WinBtn close;
         TagPill pill;
         LangSwitch langSwitch;
 
-        Rectangle rHead, rFoot, rAppLabel, rPerfLabel, rTiles, rRows, rNote, rDiscLabel, rStatus;
+        Rectangle rHead, rFoot, rAppLabel, rPerfLabel, rTiles, rRows, rNote, rDiscLabel, rStatus, rUpdLabel;
         bool dragging;
         Point dragAt;
         readonly bool initialGpu, initialUnlock, initialThrottle;
@@ -42,6 +42,9 @@ namespace HabboSiClient
         {
             get { return working.Discord != initialDiscord || (working.DiscordAppId ?? "") != initialAppId; }
         }
+
+        /// <summary>True when the user asked to reopen the current release notes.</summary>
+        public bool ReleaseNotesRequested { get; private set; }
 
         public SettingsSheet(ClientSettings current, CoreWebView2 web)
         {
@@ -112,6 +115,22 @@ namespace HabboSiClient
                 L.T("Open the inspector with F12", "Den Inspector mit F12 öffnen"),
                 working.DevTools);
             rowDev.Changed += delegate { working.DevTools = rowDev.On; };
+
+            rowBeta = MakeRow(L.T("Beta channel", "Beta-Kanal"),
+                L.T("Follow GitHub pre-releases", "GitHub-Vorabversionen folgen"),
+                working.UpdateChannel == "beta");
+            rowBeta.Changed += delegate { working.UpdateChannel = rowBeta.On ? "beta" : "stable"; };
+
+            btnNotes = new FlatBtn();
+            btnNotes.Label = L.T("Release notes", "Release-Notizen");
+            btnNotes.Icon = "info";
+            btnNotes.Click += delegate
+            {
+                ReleaseNotesRequested = true;
+                DialogResult = DialogResult.Cancel;
+                Close();
+            };
+            Controls.Add(btnNotes);
 
             rowDiscord = MakeRow(L.T("Discord Rich Presence", "Discord Rich Presence"),
                 L.T("Big artwork, client version and your room",
@@ -220,21 +239,24 @@ namespace HabboSiClient
             rowFps.Note = L.T("Frame rate readout in the footer", "Bildrate in der Fußzeile");
             rowDev.Label = L.T("Developer tools", "Entwicklerwerkzeuge");
             rowDev.Note = L.T("Open the inspector with F12", "Den Inspector mit F12 öffnen");
+            rowBeta.Label = L.T("Beta channel", "Beta-Kanal");
+            rowBeta.Note = L.T("Follow GitHub pre-releases", "GitHub-Vorabversionen folgen");
             rowDiscord.Label = L.T("Discord Rich Presence", "Discord Rich Presence");
             rowDiscord.Note = L.T("Big artwork, client version and your room",
                 "Großes Artwork, Version und dein Raum");
             fieldAppId.SetPlaceholder(L.T("Discord application ID (17–20 digits)",
                                           "Discord-Application-ID (17–20 Ziffern)"));
             btnPortal.Label = L.T("Developer Portal", "Entwickler-Portal");
+            btnNotes.Label = L.T("Release notes", "Release-Notizen");
             btnFolder.Label = L.T("Open profile folder", "Profilordner");
             btnCache.Label = L.T("Clear cache", "Cache leeren");
             btnCancel.Label = L.T("Cancel", "Abbrechen");
             btnSave.Label = L.T("Save", "Speichern");
 
-            foreach (ToggleRow r in new ToggleRow[] { rowGpu, rowUnlock, rowThrottle, rowFps, rowDev, rowDiscord })
+            foreach (ToggleRow r in new ToggleRow[] { rowGpu, rowUnlock, rowThrottle, rowFps, rowDev, rowBeta, rowDiscord })
                 r.Invalidate();
             foreach (ThemeTile t in new ThemeTile[] { tDark, tLight, tNavy }) t.Invalidate();
-            foreach (FlatBtn b in new FlatBtn[] { btnPortal, btnFolder, btnCache, btnCancel, btnSave })
+            foreach (FlatBtn b in new FlatBtn[] { btnPortal, btnFolder, btnCache, btnCancel, btnSave, btnNotes })
                 b.Invalidate();
             fieldAppId.Invalidate();
             Invalidate(true);
@@ -419,6 +441,12 @@ namespace HabboSiClient
 
             btnPortal.SetBounds(rightX, ry, T.P(160), T.P(28));
 
+            ry += T.P(40);
+            rUpdLabel = new Rectangle(rightX, ry, rightW, T.P(18));
+            ry += T.P(24);
+            rowBeta.SetBounds(rightX, ry, rightW, rowH);
+            btnNotes.SetBounds(rightX, rowBeta.Bottom + T.P(8), T.P(152), T.P(28));
+
             int bh = T.P(36);
             int by = rFoot.Y - T.P(16) - bh;
             btnFolder.SetBounds(pad, by, T.P(150), bh);
@@ -455,6 +483,7 @@ namespace HabboSiClient
             T.Str(g, L.T("APPEARANCE", "ERSCHEINUNGSBILD"), T.FLabel, T.Dim, rAppLabel, T.FL);
             T.Str(g, L.T("PERFORMANCE", "LEISTUNG"), T.FLabel, T.Dim, rPerfLabel, T.FL);
             T.Str(g, L.T("DISCORD", "DISCORD"), T.FLabel, T.Dim, rDiscLabel, T.FL);
+            T.Str(g, L.T("UPDATES", "UPDATES"), T.FLabel, T.Dim, rUpdLabel, T.FL);
 
             T.Str(g, L.T("Restart the client to apply the renderer switches.",
                          "Für die Renderer-Schalter den Client neu starten."),

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace HabboSiClient
 {
@@ -20,6 +21,12 @@ namespace HabboSiClient
         public string Display { get { return Tag.Length > 0 ? Tag : Latest; } }
     }
 
+    /// <summary>The GitHub release that matches a build, including its Markdown body.</summary>
+    internal sealed class ReleaseNotes
+    {
+        public string Tag = "", Name = "", Body = "", PageUrl = "";
+    }
+
     /// <summary>
     /// One quiet lookup per launch: the latest stable release for stable builds, and the newest
     /// pre-release for beta builds. It only reads a tag and a URL — nothing is downloaded,
@@ -31,13 +38,9 @@ namespace HabboSiClient
         const string LatestReleaseUrl = ApiRoot + "releases/latest";
         const string ReleasesUrl = ApiRoot + "releases?per_page=30";
 
-        public static UpdateInfo Latest()
+        public static UpdateInfo Latest(bool beta)
         {
-#if BETA
-            return LatestBeta();
-#else
-            return LatestStable();
-#endif
+            return beta ? LatestBeta() : LatestStable();
         }
 
         static UpdateInfo LatestStable()
@@ -77,14 +80,26 @@ namespace HabboSiClient
         }
 
         /// <summary>True when this channel's newest release is ahead of the running build.</summary>
-        public static bool HasUpdate(UpdateInfo info)
+        public static bool HasUpdate(UpdateInfo info, bool beta)
         {
             if (info == null) return false;
-#if BETA
-            return IsNewerBeta(info.Tag);
-#else
-            return IsNewer(info.Latest);
-#endif
+            return beta ? IsNewerBeta(info.Tag) : IsNewer(info.Latest);
+        }
+
+        /// <summary>The release for one tag, with its Markdown body, for the What's new sheet.</summary>
+        public static ReleaseNotes Notes(string tag)
+        {
+            if (string.IsNullOrEmpty(tag)) return null;
+            string json = Get(ApiRoot + "releases/tags/v" + Uri.EscapeDataString(tag));
+            if (json == null) return null;
+
+            ReleaseNotes n = new ReleaseNotes();
+            n.Tag = NormalizeTag(Field(json, "tag_name"));
+            n.Name = Field(json, "name");
+            n.Body = Field(json, "body");
+            n.PageUrl = Field(json, "html_url");
+            if (n.Tag.Length == 0 || n.Body.Length == 0) return null;
+            return n;
         }
 
         static string Get(string url)
@@ -234,7 +249,7 @@ namespace HabboSiClient
             }
         }
 
-        /// <summary>Reads a top-level string field; GitHub pretty-prints with a space after the colon.</summary>
+        /// <summary>Reads a top-level string field and decodes its JSON escapes.</summary>
         static string Field(string json, string key)
         {
             int i = json.IndexOf("\"" + key + "\"", StringComparison.Ordinal);
@@ -248,11 +263,73 @@ namespace HabboSiClient
             for (i++; i < json.Length; i++)
             {
                 char c = json[i];
-                if (c == '\\' && i + 1 < json.Length) { sb.Append(json[++i]); continue; }
                 if (c == '"') break;
-                sb.Append(c);
+                if (c != '\\') { sb.Append(c); continue; }
+                if (++i >= json.Length) break;
+
+                char e = json[i];
+                switch (e)
+                {
+                    case 'n': sb.Append('\n'); break;
+                    case 'r': sb.Append('\r'); break;
+                    case 't': sb.Append('\t'); break;
+                    case 'b': sb.Append('\b'); break;
+                    case 'f': sb.Append('\f'); break;
+                    case 'u':
+                        if (i + 4 < json.Length)
+                        {
+                            int code;
+                            if (int.TryParse(json.Substring(i + 1, 4), NumberStyles.HexNumber,
+                                    CultureInfo.InvariantCulture, out code))
+                            {
+                                sb.Append((char)code);
+                                i += 4;
+                            }
+                        }
+                        break;
+                    default: sb.Append(e); break;
+                }
             }
             return sb.ToString().Trim();
+        }
+    }
+
+    /// <summary>Turns a GitHub release's Markdown body into plain text for a TextBox.</summary>
+    internal static class NotesText
+    {
+        public static string ToPlain(string markdown)
+        {
+            if (string.IsNullOrEmpty(markdown)) return "";
+            string[] lines = markdown.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            StringBuilder b = new StringBuilder();
+            bool blank = true;
+
+            foreach (string raw in lines)
+            {
+                string t = raw.Trim();
+                if (t == "---" || t == "***" || t == "___") t = "";
+                if (t.Length == 0)
+                {
+                    if (!blank) { b.AppendLine(); blank = true; }
+                    continue;
+                }
+
+                bool bullet = t.StartsWith("- ") || t.StartsWith("* ") || t.StartsWith("+ ");
+                if (bullet) t = t.Substring(2);
+
+                int h = 0;
+                while (h < t.Length && t[h] == '#') h++;
+                if (h > 0 && h <= 6 && h < t.Length && t[h] == ' ') t = t.Substring(h + 1);
+                if (t.StartsWith("> ")) t = t.Substring(2);
+
+                t = Regex.Replace(t, @"\[([^\]]+)\]\(([^)]+)\)", "$1 ($2)");
+                t = t.Replace("**", "").Replace("__", "").Replace("`", "").Replace("*", "");
+                if (bullet) t = "• " + t;
+
+                b.AppendLine(t);
+                blank = false;
+            }
+            return b.ToString().Trim();
         }
     }
 }

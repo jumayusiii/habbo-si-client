@@ -58,6 +58,7 @@ namespace HabboSiClient
         readonly List<CoreWebView2Frame> frames = new List<CoreWebView2Frame>();
         string currentRoom = "";
         bool presenceAllowed;
+        bool noticeOpen;
         readonly Stopwatch clock = Stopwatch.StartNew();
 
         bool lastNavOk;
@@ -383,10 +384,11 @@ namespace HabboSiClient
             base.OnShown(e);
             if (settings.Maximized) WindowState = FormWindowState.Maximized;
             if (Program.ShotPath != null) return;
-            // captures and diagnostics must stay deterministic, so no network check there
-            if (Program.SmokeLog == null && Program.ShotLive == null && Program.ProbePath == null)
-                CheckForUpdates();
+            // captures and diagnostics must stay deterministic, so no network checks there
+            bool deterministic = Program.SmokeLog != null || Program.ShotLive != null || Program.ProbePath != null;
+            if (!deterministic) CheckForUpdates();
             await InitWeb();
+            if (!deterministic) MaybeShowWhatsNew();
         }
 
         /// <summary>
@@ -395,23 +397,98 @@ namespace HabboSiClient
         /// </summary>
         async void CheckForUpdates()
         {
-            UpdateInfo info = await Task.Run(() => UpdateCheck.Latest());
-            if (!UpdateCheck.HasUpdate(info)) return;
+            bool beta = settings.UpdateChannel == "beta";
+            UpdateInfo info = await Task.Run(() => UpdateCheck.Latest(beta));
+            if (!UpdateCheck.HasUpdate(info, beta)) return;
             if (IsDisposed || !IsHandleCreated) return;
             try
             {
                 BeginInvoke(new Action(delegate
                 {
-                    if (IsDisposed) return;
-                    string body = L.T(
-                        AppInfo.Name + " " + info.Display + " is available. You are running " + AppInfo.Version + ".",
-                        AppInfo.Name + " " + info.Display + " ist verfügbar. Du verwendest " + AppInfo.Version + ".");
-                    bool open = MessageSheetForm.Notice(this,
-                        L.T("Update available", "Update verfügbar"),
-                        body, info.PageUrl,
-                        L.T("Open release", "Release öffnen"),
-                        L.T("Later", "Später"));
-                    if (open) OpenExternal(info.PageUrl);
+                    if (IsDisposed || !BeginNotice()) return;
+                    try
+                    {
+                        string body = L.T(
+                            AppInfo.Name + " " + info.Display + " is available. You are running " + AppInfo.Version + ".",
+                            AppInfo.Name + " " + info.Display + " ist verfügbar. Du verwendest " + AppInfo.Version + ".");
+                        bool open = MessageSheetForm.Notice(this,
+                            L.T("Update available", "Update verfügbar"),
+                            body, info.PageUrl,
+                            L.T("Open release", "Release öffnen"),
+                            L.T("Later", "Später"));
+                        if (open) OpenExternal(info.PageUrl);
+                    }
+                    finally { EndNotice(); }
+                }));
+            }
+            catch { }
+        }
+
+        /// <summary>Only one themed notice at a time; a skipped note retries on the next launch.</summary>
+        bool BeginNotice()
+        {
+            if (noticeOpen) return false;
+            noticeOpen = true;
+            return true;
+        }
+
+        void EndNotice() { noticeOpen = false; }
+
+        /// <summary>Shows the current build's release notes once per profile.</summary>
+        async void MaybeShowWhatsNew()
+        {
+            if (settings.SeenRelease == AppInfo.ReleaseTag) return;
+            ReleaseNotes notes = await Task.Run(() => UpdateCheck.Notes(AppInfo.ReleaseTag));
+            if (notes == null || string.IsNullOrEmpty(notes.Body)) return;
+            if (IsDisposed || !IsHandleCreated) return;
+            try
+            {
+                BeginInvoke(new Action(delegate
+                {
+                    if (IsDisposed || !BeginNotice()) return;
+                    try
+                    {
+                        bool open = WhatsNewForm.ShowSheet(this, notes);
+                        settings.SeenRelease = AppInfo.ReleaseTag;
+                        Store.Save(settings);
+                        if (open && !string.IsNullOrEmpty(notes.PageUrl)) OpenExternal(notes.PageUrl);
+                    }
+                    finally { EndNotice(); }
+                }));
+            }
+            catch { }
+        }
+
+        /// <summary>Loads and shows the running build's notes even after the startup sheet was dismissed.</summary>
+        async void ShowReleaseNotes()
+        {
+            ReleaseNotes notes;
+            try { notes = await Task.Run(() => UpdateCheck.Notes(AppInfo.ReleaseTag)); }
+            catch { notes = null; }
+
+            if (IsDisposed || !IsHandleCreated) return;
+            try
+            {
+                BeginInvoke(new Action(delegate
+                {
+                    if (IsDisposed || !BeginNotice()) return;
+                    try
+                    {
+                        if (notes == null || string.IsNullOrEmpty(notes.Body))
+                        {
+                            MessageSheetForm.Error(this,
+                                L.T("Release notes unavailable", "Release-Notizen nicht verfügbar"),
+                                L.T("The release notes could not be loaded. Check your connection and try again.",
+                                   "Die Release-Notizen konnten nicht geladen werden. Verbindung prüfen und erneut versuchen."),
+                                AppInfo.ReleaseTag);
+                            return;
+                        }
+                        bool open = WhatsNewForm.ShowSheet(this, notes);
+                        settings.SeenRelease = AppInfo.ReleaseTag;
+                        Store.Save(settings);
+                        if (open && !string.IsNullOrEmpty(notes.PageUrl)) OpenExternal(notes.PageUrl);
+                    }
+                    finally { EndNotice(); }
                 }));
             }
             catch { }
@@ -621,15 +698,23 @@ namespace HabboSiClient
         {
             using (SettingsSheet sheet = new SettingsSheet(settings, core))
             {
-                if (sheet.ShowDialog(this) != DialogResult.OK) return;
+                DialogResult result = sheet.ShowDialog(this);
+                if (sheet.ReleaseNotesRequested)
+                {
+                    ShowReleaseNotes();
+                    return;
+                }
+                if (result != DialogResult.OK) return;
                 bool restart = sheet.BrowserArgsChanged;
                 bool discord = sheet.DiscordChanged;
+                bool channelChanged = sheet.Result.UpdateChannel != settings.UpdateChannel;
                 settings = sheet.Result;
                 L.De = settings.German;
                 ApplyChrome();
                 LayoutAll();
                 Invalidate(true);
                 if (discord) StartPresence();
+                if (channelChanged) CheckForUpdates();
                 if (restart) ShowToast(L.T("Restart the client to apply graphics settings",
                     "Client neu starten, um Grafik-Einstellungen anzuwenden"));
             }

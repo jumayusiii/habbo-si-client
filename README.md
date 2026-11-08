@@ -57,7 +57,18 @@ compiles the same sources with the `BETA` define and writes
 `dist/beta/Habbo.si Client Beta.exe`. That build calls itself **Habbo.si Client Beta**, keeps its
 own `%LOCALAPPDATA%\HabboSiClientBeta` profile and settings, and checks GitHub pre-releases
 instead of the latest stable release, so it can be installed and signed in next to the stable
-client. Beta builds also carry a filled **BETA** badge beside the `CLIENT` pill.
+client. Beta builds also carry a filled **BETA** badge beside the `CLIENT` pill. Either build can
+follow the stable or beta release feed from **Settings → Updates**.
+
+### Rust beta port
+
+An in-progress native Rust port of the beta lives in [`rust/`](rust/README.md). It is a
+separate executable and profile — `Habbo.si Client Beta (Rust).exe` and
+`%LOCALAPPDATA%\HabboSiClientBetaRust` — so it can run beside the C# beta without sharing
+a WebView2 session. The first milestone already hosts the hotel through `wry`/WebView2,
+carries the beta update feed, and has the settings, update and What's new sheets. The
+custom borderless chrome, Discord presence, language switch and release packaging are
+not ported yet. Build it with `./rust/build.sh`.
 
 ## First start
 
@@ -83,6 +94,8 @@ session if you want to switch accounts.
   build date.
 - **Update check** — at launch the client reads the public GitHub releases feed and, if a newer
   tag exists, offers its release page in the browser. It never downloads or installs anything.
+- **What's new** — after an update, the next launch shows that release's GitHub notes in a themed,
+  scrollable sheet, once per profile; reopen it from **Settings → Updates**.
 - **Zoom** — `−` / `+` in the app bar or `Ctrl` `+` / `−` / `0`; 50 %–200 %, remembered.
 - **Fullscreen** — `F11` (or `Esc` to leave) drops the chrome for a clean client surface.
 - **Themes** — dark, light and navy palettes for the chrome, chosen in Settings and previewed live.
@@ -117,6 +130,8 @@ The cog in the app bar opens the themed sheet:
   background” are renderer switches and need a restart (the sheet marks them). Show FPS and
   developer tools apply at once.
 - **Profile** — open the WebView2 profile folder, or clear cached assets and the saved session.
+- **Updates** — follow stable releases or beta pre-releases; the launch-time update check uses
+  that choice, and a **Release notes** button reopens the installed build's sheet.
 - **Discord** — Rich Presence on/off and the application ID. The dot shows whether the local
   Discord client is connected; the room line updates on its own.
 
@@ -152,8 +167,8 @@ A publisher can bake an ID into `DiscordRpc.BuiltInAppId` so users do not have t
 ```
 
 Delete that folder to reset the client completely. Nothing is uploaded by the client. The hotel's
-own connections and one launch-time request to the public GitHub releases feed are the only
-network traffic; the update check sends no account data.
+own connections and at most two launch-time requests to the public GitHub releases feed(the update lookup and, when the notes sheet opens, that release's notes) are the only network traffic;
+they send no account data.
 
 ## Where the interface came from
 
@@ -195,6 +210,11 @@ that UI code.
 "dist\Habbo.si Client.exe" --presence-json presence.json
                                                     # write the SET_ACTIVITY payload and exit
 "dist\Habbo.si Client.exe" --update-check update.txt  # GitHub release lookup and exit
+"dist\Habbo.si Client.exe" --update-check update.txt --channel beta
+                                                    # same lookup against pre-releases
+"dist\Habbo.si Client.exe" --release-notes notes.txt # current release's notes and exit
+"dist\Habbo.si Client.exe" --shot-notes notes.png    # render the What's new sheet
+"dist\Habbo.si Client.exe" --data .\profile          # isolated settings + WebView2 profile
 "distHabbo.si Client.exe" --probe room.json           # dump room/DOM diagnostics
 "dist\Habbo.si Client.exe" --theme light --nosplash # light chrome
 "dist\Habbo.si Client.exe" --lang de                # German chrome

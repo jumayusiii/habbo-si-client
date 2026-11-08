@@ -49,6 +49,13 @@ namespace HabboSiClient
                 }
             }
             T.Init(forcedScale ? T.S : 1f);
+
+            // developer aid: keep a capture or test run out of the real profile
+            string dataDir = Value(args, "--data");
+            if (dataDir != null)
+            {
+                try { Store.OverrideDir = Path.GetFullPath(dataDir); } catch { }
+            }
             Store.Ensure();
 
             ClientSettings settings = Store.Load();
@@ -84,15 +91,56 @@ namespace HabboSiClient
             string updatePath = Value(args, "--update-check");
             if (updatePath != null)
             {
-                UpdateInfo info = UpdateCheck.Latest();
+                string forcedChannel = Value(args, "--channel");
+                if (forcedChannel != null)
+                    settings.UpdateChannel = forcedChannel.Equals("beta", StringComparison.OrdinalIgnoreCase)
+                        ? "beta" : "stable";
+                bool betaChannel = settings.UpdateChannel == "beta";
+                UpdateInfo info = UpdateCheck.Latest(betaChannel);
                 string text =
                     "running=" + AppInfo.Version + "\r\n" +
-                    "channel=" + (AppInfo.Beta ? "beta" : "stable") + "\r\n" +
+                    "channel=" + (betaChannel ? "beta" : "stable") + "\r\n" +
                     "latest=" + (info != null ? info.Display : "") + "\r\n" +
                     "page=" + (info != null ? info.PageUrl : "") + "\r\n" +
-                    "newer=" + UpdateCheck.HasUpdate(info) + "\r\n" +
+                    "newer=" + UpdateCheck.HasUpdate(info, betaChannel) + "\r\n" +
                     "error=" + (info == null ? "no release or network" : "") + "\r\n";
                 File.WriteAllText(updatePath, text);
+                return;
+            }
+
+            // developer aid: inspect or render the current build's release notes
+            string notesPath = Value(args, "--release-notes");
+            string shotNotes = Value(args, "--shot-notes");
+            if (notesPath != null || shotNotes != null)
+            {
+                ReleaseNotes notes = UpdateCheck.Notes(AppInfo.ReleaseTag);
+                if (notesPath != null)
+                {
+                    File.WriteAllText(notesPath,
+                        "tag=" + (notes != null ? notes.Tag : "") + "\r\n" +
+                        "name=" + (notes != null ? notes.Name : "") + "\r\n" +
+                        "page=" + (notes != null ? notes.PageUrl : "") + "\r\n" +
+                        "body_chars=" + (notes != null ? notes.Body.Length : 0) + "\r\n" +
+                        "error=" + (notes == null ? "no notes or network" : "") + "\r\n");
+                    return;
+                }
+                if (notes != null)
+                {
+                    using (WhatsNewForm f = new WhatsNewForm(notes))
+                    {
+                        f.StartPosition = FormStartPosition.Manual;
+                        f.Location = new Point(-20000, -20000);
+                        f.Show();
+                        Application.DoEvents();
+                        f.Refresh();
+                        using (Bitmap bmp = new Bitmap(f.Width, f.Height))
+                        {
+                            f.DrawToBitmap(bmp, new Rectangle(0, 0, f.Width, f.Height));
+                            bmp.Save(shotNotes, ImageFormat.Png);
+                        }
+                        f.Close();
+                    }
+                }
                 return;
             }
 
