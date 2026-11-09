@@ -97,7 +97,7 @@ fn main() {
             &discord::presence_details("SUNSET LOUNGE"),
             "On habbo.si",
             discord::ARTWORK_URL,
-            &format!("{} v{}", settings::NAME, settings::VERSION),
+            &discord::large_text(),
         );
         if let Err(error) = fs::write(path, json) {
             eprintln!("could not write presence payload: {error}");
@@ -314,13 +314,14 @@ fn run(args: Vec<String>) -> Result<(), String> {
     }
 
     if presence_allowed {
+        // Keep the room line close to the hotel: poll straight away, then every two seconds.
         let proxy = proxy.clone();
         thread::spawn(move || {
             loop {
-                thread::sleep(Duration::from_secs(4));
                 if proxy.send_event(Action::PollRoom).is_err() {
                     break;
                 }
+                thread::sleep(Duration::from_secs(2));
             }
         });
     }
@@ -509,22 +510,24 @@ fn run(args: Vec<String>) -> Result<(), String> {
                 }
                 Action::Room(raw) => {
                     let raw = room::unquote(&raw);
-                    if let Some(found) = room::pick_room(&raw) {
-                        if found != shell.room {
-                            shell.room = found;
-                            if presence_allowed && settings.discord {
-                                discord.set_activity(
-                                    discord::presence_details(&shell.room),
-                                    "On habbo.si".to_string(),
-                                );
-                            }
-                            footer_set(
-                                &shell.footer,
-                                &shell.status(&settings),
-                                shell.fps,
-                                settings.showfps,
+                    // An empty probe means the hotel no longer exposes a room (navigator, login),
+                    // so the presence falls back to "Exploring the hotel" instead of freezing on
+                    // the last room the user visited.
+                    let found = room::pick_room(&raw).unwrap_or_default();
+                    if found != shell.room {
+                        shell.room = found;
+                        if presence_allowed && settings.discord {
+                            discord.set_activity(
+                                discord::presence_details(&shell.room),
+                                "On habbo.si".to_string(),
                             );
                         }
+                        footer_set(
+                            &shell.footer,
+                            &shell.status(&settings),
+                            shell.fps,
+                            settings.showfps,
+                        );
                     }
                 }
                 Action::PollRoom => {

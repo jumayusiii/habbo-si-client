@@ -8,10 +8,15 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use crate::settings::{NAME, VERSION};
+use crate::settings::{SHORT_NAME, VERSION};
 
 pub const ARTWORK_URL: &str =
     "https://raw.githubusercontent.com/jumayusiii/habbo-si-client/main/assets/logo.png";
+
+/// Hover text on the large artwork: the short client name and the running build's version.
+pub fn large_text() -> String {
+    format!("{SHORT_NAME} v{VERSION}")
+}
 
 const OP_HANDSHAKE: u32 = 0;
 const OP_FRAME: u32 = 1;
@@ -255,8 +260,8 @@ fn session(
         // Discord accepts roughly five activity updates per 20 s; the change flag avoids
         // burning that budget while the heartbeat keeps the presence from expiring.
         let changed = dirty.load(Ordering::Relaxed);
-        let due = changed || last_send.is_none_or(|sent| sent.elapsed() >= Duration::from_secs(25));
-        let allowed = last_send.is_none_or(|sent| sent.elapsed() >= Duration::from_millis(3500));
+        let due = changed || last_send.is_none_or(|sent| sent.elapsed() >= Duration::from_secs(15));
+        let allowed = last_send.is_none_or(|sent| sent.elapsed() >= Duration::from_secs(4));
         if due && allowed {
             let current = activity.lock().map(|a| a.clone()).unwrap_or_default();
             let frame = activity_json(
@@ -265,7 +270,7 @@ fn session(
                 &current.details,
                 &current.state,
                 ARTWORK_URL,
-                &format!("{NAME} v{VERSION}"),
+                &large_text(),
             );
             if !write_frame(pipe, OP_FRAME, &frame) {
                 return;
@@ -491,6 +496,11 @@ mod tests {
             "Hanging out in Sunset Lounge"
         );
         assert_eq!(presence_details(""), "Exploring the hotel");
+    }
+
+    #[test]
+    fn artwork_hover_names_the_build() {
+        assert_eq!(large_text(), format!("Habbo.si Client v{VERSION}"));
     }
 
     #[test]

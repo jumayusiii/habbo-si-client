@@ -11,6 +11,8 @@
 - Splash paints at full opacity on its first visible frame: the CSS fade and its keyframes are gone, so the window never opens on a half-drawn logo.
 - Zoom removed from the client: the header control, the `Ctrl` `+` / `-` / `0` shortcuts, the saved zoom state and every WebView zoom call are gone; WebView2's built-in page zoom stays disabled.
 - Discord Rich Presence now retries and reconnects instead of giving up when the pipe is not ready, waits for Discord's READY handshake, answers PING frames, and keeps a stable elapsed timer.
+- Discord's big-artwork hover shows the short client name and the running build: `Habbo.si Client v1.2.0-beta.4`.
+- Discord presence follows the hotel in near real time: the room is probed immediately and every two seconds, clears back to `Exploring the hotel` when no room is visible, and the activity is refreshed on a 15-second heartbeat.
 
 ## 1.2.0-beta.3 — 2026-11-09
 

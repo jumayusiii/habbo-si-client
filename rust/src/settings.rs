@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const NAME: &str = "Habbo.si Client Beta";
+/// The product name shown in Discord's artwork hover; the build channel stays out of it.
+pub const SHORT_NAME: &str = "Habbo.si Client";
 pub const VERSION: &str = "1.2.0-beta.4";
 pub const RELEASE_TAG: &str = "1.2.0-beta.4";
 /// Stamped by `build.rs`, so the header always shows the binary it belongs to.
