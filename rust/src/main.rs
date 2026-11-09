@@ -1,32 +1,53 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod capture;
+mod discord;
+mod lang;
 mod pages;
+mod room;
 mod settings;
+mod theme;
 mod updates;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use tao::dpi::LogicalSize;
+use tao::dpi::{LogicalPosition, LogicalSize};
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy, EventLoopWindowTarget};
-use tao::window::{Fullscreen, Icon, Window, WindowBuilder};
+use tao::window::{Fullscreen, Icon, ResizeDirection, Window, WindowBuilder};
 use wry::{
-    Theme as WebTheme, WebContext, WebView, WebViewBuilder, WebViewBuilderExtWindows,
+    Rect, Theme as WebTheme, WebContext, WebView, WebViewBuilder, WebViewBuilderExtWindows,
 };
 
+use discord::Discord;
+use lang::Lang;
 use settings::{Settings, SettingsForm};
+
+const BAR_HEIGHT: f64 = 64.0;
+const FOOTER_HEIGHT: f64 = 30.0;
+const SPLASH_WIDTH: f64 = 560.0;
+const SPLASH_HEIGHT: f64 = 320.0;
 
 #[derive(Debug)]
 enum Action {
-    Ipc(String),
-    SheetMsg(u64, String),
+    Chrome(String),
+    Hotel(String),
+    Sheet(u64, String),
+    Room(String),
+    PollRoom,
+    Probe,
+    ProbeRoom(String),
+    ProbeDiag(String),
     Update(updates::UpdateInfo),
     Notes(updates::ReleaseNotes),
     ShowNotes,
+    SplashDone,
     Smoke,
+    Shot,
+    ShotLive,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -34,12 +55,6 @@ enum SheetKind {
     Settings,
     Notes,
     Update,
-}
-
-struct Client {
-    webview: WebView,
-    window: Window,
-    _context: WebContext,
 }
 
 struct Sheet {
@@ -51,9 +66,41 @@ struct Sheet {
     page_url: Option<String>,
 }
 
+struct Shell {
+    window: Window,
+    chrome: WebView,
+    hotel: Option<WebView>,
+    footer: WebView,
+    splash: Option<WebView>,
+    _hotel_context: WebContext,
+    _surface_context: WebContext,
+    fullscreen: bool,
+    fps: Option<u32>,
+    zoom: f64,
+    room: String,
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
+    if let Some(path) = settings::value(&args, "--presence-json") {
+        let started = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let json = discord::activity_json(
+            std::process::id(),
+            started,
+            &discord::presence_details("SUNSET LOUNGE"),
+            "On habbo.si",
+            discord::ARTWORK_URL,
+            &format!("{} v{}", settings::NAME, settings::VERSION),
+        );
+        if let Err(error) = fs::write(path, json) {
+            eprintln!("could not write presence payload: {error}");
+        }
+        return;
+    }
     if let Some(path) = settings::value(&args, "--update-check") {
         write_update_check(&args, path);
         return;
@@ -78,71 +125,211 @@ fn main() {
 fn run(args: Vec<String>) -> Result<(), String> {
     let dir = settings::data_dir(&args);
     settings::ensure(&dir);
+    // The running WebView2 owns its profile, so a clear queued by the last run is
+    // applied here, before the profile is opened again.
+    settings::apply_pending_cache_clear(&dir);
+
     let mut settings = settings::load(&dir);
-    if let Some(channel) = settings::value(&args, "--channel") {
-        settings.channel = if channel.eq_ignore_ascii_case("stable") {
-            "stable".into()
-        } else {
-            "beta".into()
+    apply_overrides(&mut settings, &args);
+    settings.clamp_zoom();
+
+    let shot_path = settings::value(&args, "--shot").map(PathBuf::from);
+    let live_path = settings::value(&args, "--shot-live").map(PathBuf::from);
+    let smoke_path = settings::value(&args, "--smoke").map(PathBuf::from);
+    let probe_path = settings::value(&args, "--probe").map(PathBuf::from);
+    let preview = shot_path.is_some()
+        || live_path.is_some()
+        || smoke_path.is_some()
+        || probe_path.is_some();
+    let presence_allowed = !preview;
+    let show_splash = !preview && !settings::has(&args, "--nosplash");
+
+    if let Some(path) = settings::value(&args, "--shot-settings") {
+        let html = pages::settings_page(&settings, "off");
+        return shot_sheet(
+            path,
+            "Settings — Habbo.si Client Beta",
+            900.0,
+            700.0,
+            html,
+        );
+    }
+    if let Some(path) = settings::value(&args, "--shot-notes") {
+        let Some(notes) = updates::current_notes() else {
+            return Err("no release notes available".into());
         };
+        let html = pages::notes_page(&notes, &settings);
+        return shot_sheet(path, "What's new — Habbo.si Client Beta", 700.0, 640.0, html);
     }
 
     let event_loop = EventLoopBuilder::<Action>::with_user_event().build();
     let proxy = event_loop.create_proxy();
-
     let title = base_title();
+    let scale = 1.0;
+    let logical = LogicalSize::new(
+        settings.width.clamp(980, 10000) as f64 / scale,
+        settings.height.clamp(620, 10000) as f64 / scale,
+    );
+
     let window = WindowBuilder::new()
         .with_title(&title)
-        .with_inner_size(LogicalSize::new(
-            settings.width.clamp(980, 10000) as f64,
-            settings.height.clamp(620, 10000) as f64,
-        ))
+        .with_decorations(false)
+        .with_transparent(false)
+        .with_inner_size(logical)
         .with_min_inner_size(LogicalSize::new(980.0, 620.0))
         .with_maximized(settings.maximized)
         .with_window_icon(icon())
-        .with_theme(Some(tao::window::Theme::Dark))
+        .with_theme(Some(window_theme(&settings)))
         .build(&event_loop)
-        .map_err(|e| format!("could not create the window: {e}"))?;
+        .map_err(|error| format!("could not create the window: {error}"))?;
 
-    settings::ensure(&dir);
-    let mut context = WebContext::new(Some(dir.join("WebView2")));
-    let ipc_proxy = proxy.clone();
-    let webview = WebViewBuilder::new_with_web_context(&mut context)
-        .with_url(settings::CLIENT_URL)
-        .with_background_color((11, 20, 32, 255))
-        .with_devtools(true)
-        .with_clipboard(true)
-        .with_theme(WebTheme::Dark)
-        .with_hotkeys_zoom(false)
-        .with_initialization_script(INIT_SCRIPT)
-        .with_additional_browser_args(settings.browser_args())
-        .with_ipc_handler(move |request| {
-            let _ = ipc_proxy.send_event(Action::Ipc(request.body().to_string()));
-        })
-        .build(&window)
-        .map_err(|e| format!("WebView2 could not start: {e}"))?;
+    let mut hotel_context = WebContext::new(Some(settings::profile_dir(&dir)));
+    let mut surface_context = WebContext::new(Some(settings::surface_dir(&dir)));
+    let scale = window.scale_factor();
+    let size = window.inner_size();
+    let width = size.width as f64 / scale;
+    let height = size.height as f64 / scale;
+    let middle = (height - BAR_HEIGHT - FOOTER_HEIGHT).max(0.0);
 
-    let _ = webview.zoom(settings.zoom);
-    let client = Client {
-        webview,
-        window,
-        _context: context,
+    let hotel = if shot_path.is_some() {
+        None
+    } else {
+        let hotel_proxy = proxy.clone();
+        Some(
+            WebViewBuilder::new_with_web_context(&mut hotel_context)
+                .with_url(settings::CLIENT_URL)
+                .with_background_color((11, 20, 32, 255))
+                .with_bounds(rect(0.0, BAR_HEIGHT, width, middle))
+                .with_devtools(true)
+                .with_clipboard(true)
+                .with_theme(WebTheme::Dark)
+                .with_hotkeys_zoom(false)
+                .with_initialization_script(INIT_SCRIPT)
+                .with_additional_browser_args(&settings.browser_args())
+                .with_ipc_handler(move |request| {
+                    let _ = hotel_proxy.send_event(Action::Hotel(request.body().to_string()));
+                })
+                .build_as_child(&window)
+                .map_err(|error| format!("WebView2 could not start: {error}"))?,
+        )
     };
-    let main_id = client.window.id();
+    let _ = hotel.as_ref().map(|hotel| hotel.zoom(settings.zoom));
+
+    let chrome_proxy = proxy.clone();
+    let chrome = WebViewBuilder::new_with_web_context(&mut surface_context)
+        .with_html(pages::chrome_page(&settings))
+        .with_bounds(rect(0.0, 0.0, width, BAR_HEIGHT))
+        .with_background_color((14, 25, 40, 255))
+        .with_focused(false)
+        .with_ipc_handler(move |request| {
+            let _ = chrome_proxy.send_event(Action::Chrome(request.body().to_string()));
+        })
+        .build_as_child(&window)
+        .map_err(|error| format!("the client chrome could not start: {error}"))?;
+
+    let footer = WebViewBuilder::new_with_web_context(&mut surface_context)
+        .with_html(pages::footer_page(&settings))
+        .with_bounds(rect(0.0, BAR_HEIGHT + middle, width, FOOTER_HEIGHT))
+        .with_background_color((11, 20, 32, 255))
+        .with_focused(false)
+        .build_as_child(&window)
+        .map_err(|error| format!("the client footer could not start: {error}"))?;
+
+    let splash = if show_splash {
+        let splash_width = SPLASH_WIDTH.min(width);
+        let splash_height = SPLASH_HEIGHT.min(height);
+        Some(
+            WebViewBuilder::new_with_web_context(&mut surface_context)
+                .with_html(pages::splash_page())
+                .with_bounds(rect(
+                    (width - splash_width) / 2.0,
+                    (height - splash_height) / 2.0,
+                    splash_width,
+                    splash_height,
+                ))
+                .with_background_color((11, 20, 32, 255))
+                .with_focused(false)
+                .build_as_child(&window)
+                .map_err(|error| format!("the splash screen could not start: {error}"))?,
+        )
+    } else {
+        None
+    };
+
+    let mut shell = Shell {
+        window,
+        chrome,
+        hotel,
+        footer,
+        splash,
+        _hotel_context: hotel_context,
+        _surface_context: surface_context,
+        fullscreen: false,
+        fps: None,
+        zoom: settings.zoom,
+        room: String::new(),
+    };
+    shell.update_zoom_label();
+    shell.update_max_icon(settings.maximized);
+    footer_set(&shell.footer, &localized_starting(&settings), None, settings.showfps);
+
+    let main_id = shell.window.id();
     let mut sheet: Option<Sheet> = None;
     let mut sheet_seq = 0u64;
-    let mut fullscreen = false;
-    let mut fps: Option<u32> = None;
+    let mut discord = Discord::new();
+    if presence_allowed {
+        start_presence(&mut discord, &settings);
+    }
 
-    // Give the first paint a moment to finish before a smoke run reports the URL.
-    let smoke_path = settings::value(&args, "--smoke").map(PathBuf::from);
+    if show_splash {
+        let proxy = proxy.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(1650));
+            let _ = proxy.send_event(Action::SplashDone);
+        });
+    }
+
+    if presence_allowed {
+        let proxy = proxy.clone();
+        thread::spawn(move || loop {
+            thread::sleep(Duration::from_secs(4));
+            if proxy.send_event(Action::PollRoom).is_err() {
+                break;
+            }
+        });
+    }
+
+    if let Some(path) = probe_path.clone() {
+        let proxy = proxy.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_secs(12));
+            if proxy.send_event(Action::Probe).is_err() {
+                let _ = path;
+            }
+        });
+    }
     if smoke_path.is_some() {
         let proxy = proxy.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(8));
+            thread::sleep(Duration::from_secs(20));
             let _ = proxy.send_event(Action::Smoke);
         });
-    } else if !settings::has(&args, "--no-update-check") {
+    }
+    if shot_path.is_some() {
+        let proxy = proxy.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(1800));
+            let _ = proxy.send_event(Action::Shot);
+        });
+    }
+    if live_path.is_some() {
+        let proxy = proxy.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_secs(10));
+            let _ = proxy.send_event(Action::ShotLive);
+        });
+    }
+    if !preview && !settings::has(&args, "--no-update-check") {
         spawn_update_check(
             proxy.clone(),
             settings.beta_channel(),
@@ -150,77 +337,193 @@ fn run(args: Vec<String>) -> Result<(), String> {
         );
     }
 
+    let mut probe_room: Option<String> = None;
+    let mut probe_diag: Option<String> = None;
+    let mut smoke_fired = false;
+
     event_loop.run(move |event, target, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            Event::WindowEvent { window_id, event, .. } => {
-                if window_id == main_id {
-                    match event {
-                        WindowEvent::CloseRequested => {
-                            settings.maximized = client.window.is_maximized();
-                            if !settings.maximized && !fullscreen {
-                                let size = client.window.inner_size();
-                                settings.width = size.width.max(1);
-                                settings.height = size.height.max(1);
-                            }
-                            let _ = settings::save(&dir, &settings);
-                            *control_flow = ControlFlow::Exit;
+            Event::WindowEvent {
+                window_id,
+                event: WindowEvent::CloseRequested,
+                ..
+            } if window_id == main_id => {
+                persist(&shell, &mut settings, &dir, preview);
+                *control_flow = ControlFlow::Exit;
+            }
+            Event::WindowEvent {
+                window_id,
+                event,
+                ..
+            } if window_id == main_id => {
+                match event {
+                    WindowEvent::Resized(_) => {
+                        shell.layout();
+                        if !shell.fullscreen && !shell.window.is_maximized() {
+                            let scale = shell.window.scale_factor();
+                            let size = shell.window.inner_size();
+                            settings.width = (size.width as f64 / scale).round() as u32;
+                            settings.height = (size.height as f64 / scale).round() as u32;
                         }
-                        WindowEvent::Resized(size) => {
-                            if !fullscreen && !client.window.is_maximized() {
-                                settings.width = size.width.max(1);
-                                settings.height = size.height.max(1);
-                            }
-                        }
-                        _ => {}
                     }
-                    return;
+                    WindowEvent::ScaleFactorChanged { .. } => shell.layout(),
+                    _ => {}
                 }
-
-                let close_sheet = sheet
+            }
+            Event::WindowEvent {
+                window_id,
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
+                if sheet
                     .as_ref()
-                    .map(|s| {
-                        s.window.id() == window_id
-                            && matches!(event, WindowEvent::CloseRequested)
-                    })
-                    .unwrap_or(false);
-                if close_sheet {
+                    .map(|current| current.window.id() == window_id)
+                    .unwrap_or(false)
+                {
                     sheet = None;
                 }
             }
             Event::UserEvent(action) => match action {
-                Action::Ipc(message) => {
-                    handle_ipc(
+                Action::Chrome(message) => {
+                    let quit = shell_action(
                         &message,
-                        &client,
+                        &mut shell,
                         &mut settings,
                         &dir,
                         &proxy,
                         target,
                         &mut sheet,
                         &mut sheet_seq,
-                        &mut fullscreen,
-                        &mut fps,
+                        &mut discord,
                     );
+                    if quit {
+                        persist(&shell, &mut settings, &dir, preview);
+                        *control_flow = ControlFlow::Exit;
+                    }
                 }
-                Action::SheetMsg(id, message) => {
+                Action::Hotel(message) => {
+                    if let Some(value) = message.strip_prefix("fps:") {
+                        if let Ok(value) = value.parse::<u32>() {
+                            shell.fps = Some(value);
+                            footer_set(
+                                &shell.footer,
+                                &shell.status(&settings),
+                                shell.fps,
+                                settings.showfps,
+                            );
+                        }
+                        return;
+                    }
+                    if message == "loaded" {
+                        footer_set(
+                            &shell.footer,
+                            lang(&settings).t("Connected", "Verbunden"),
+                            shell.fps,
+                            settings.showfps,
+                        );
+                        // A smoke run reports the URL only after a real navigation finished.
+                        if smoke_path.is_some() && !smoke_fired {
+                            smoke_fired = true;
+                            let proxy = proxy.clone();
+                            thread::spawn(move || {
+                                thread::sleep(Duration::from_millis(1200));
+                                let _ = proxy.send_event(Action::Smoke);
+                            });
+                        }
+                        return;
+                    }
+                    let quit = shell_action(
+                        &message,
+                        &mut shell,
+                        &mut settings,
+                        &dir,
+                        &proxy,
+                        target,
+                        &mut sheet,
+                        &mut sheet_seq,
+                        &mut discord,
+                    );
+                    if quit {
+                        persist(&shell, &mut settings, &dir, preview);
+                        *control_flow = ControlFlow::Exit;
+                    }
+                }
+                Action::Sheet(id, message) => {
                     let close = sheet
                         .as_ref()
-                        .filter(|s| s.id == id)
+                        .filter(|current| current.id == id)
                         .map(|current| {
                             handle_sheet_message(
                                 &message,
                                 current,
-                                &client,
+                                &shell,
                                 &mut settings,
                                 &dir,
                                 &proxy,
+                                &mut discord,
                             )
                         })
                         .unwrap_or(false);
                     if close {
                         sheet = None;
+                    }
+                }
+                Action::Room(raw) => {
+                    let raw = room::unquote(&raw);
+                    if let Some(found) = room::pick_room(&raw) {
+                        if found != shell.room {
+                            shell.room = found;
+                            if presence_allowed && settings.discord {
+                                discord.set_activity(
+                                    discord::presence_details(&shell.room),
+                                    "On habbo.si".to_string(),
+                                );
+                            }
+                            footer_set(
+                                &shell.footer,
+                                &shell.status(&settings),
+                                shell.fps,
+                                settings.showfps,
+                            );
+                        }
+                    }
+                }
+                Action::PollRoom => {
+                    if let Some(hotel) = &shell.hotel {
+                        let proxy = proxy.clone();
+                        let _ = hotel.evaluate_script_with_callback(room::ROOM_JS, move |value| {
+                            let _ = proxy.send_event(Action::Room(value));
+                        });
+                    }
+                }
+                Action::Probe => {
+                    if let Some(hotel) = &shell.hotel {
+                        let room_proxy = proxy.clone();
+                        let _ =
+                            hotel.evaluate_script_with_callback(room::ROOM_JS, move |value| {
+                                let _ = room_proxy.send_event(Action::ProbeRoom(value));
+                            });
+                        let diag_proxy = proxy.clone();
+                        let _ =
+                            hotel.evaluate_script_with_callback(room::DIAG_JS, move |value| {
+                                let _ = diag_proxy.send_event(Action::ProbeDiag(value));
+                            });
+                    }
+                }
+                Action::ProbeRoom(value) => {
+                    probe_room = Some(value);
+                    if let (Some(path), Some(diag)) = (&probe_path, &probe_diag) {
+                        write_probe(path, probe_room.as_deref().unwrap_or(""), diag);
+                        *control_flow = ControlFlow::Exit;
+                    }
+                }
+                Action::ProbeDiag(value) => {
+                    probe_diag = Some(value);
+                    if let (Some(path), Some(found)) = (&probe_path, &probe_room) {
+                        write_probe(path, found, probe_diag.as_deref().unwrap_or(""));
+                        *control_flow = ControlFlow::Exit;
                     }
                 }
                 Action::Update(info) => {
@@ -234,7 +537,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
                             "Update available — Habbo.si Client Beta",
                             560.0,
                             360.0,
-                            pages::update_page(&info),
+                            pages::update_page(&info, &settings),
                             Some(info.page.clone()),
                             &dir.join("ui"),
                         );
@@ -251,13 +554,11 @@ fn run(args: Vec<String>) -> Result<(), String> {
                             "What's new — Habbo.si Client Beta",
                             700.0,
                             640.0,
-                            pages::notes_page(&notes),
+                            pages::notes_page(&notes, &settings),
                             Some(notes.page.clone()),
                             &dir.join("ui"),
                         );
                         if opened.is_some() {
-                            // The sheet is shown once per profile. If it could not be
-                            // created, leave the marker alone so the next launch retries.
                             settings.seenrelease = settings::RELEASE_TAG.into();
                             let _ = settings::save(&dir, &settings);
                             sheet = opened;
@@ -272,9 +573,21 @@ fn run(args: Vec<String>) -> Result<(), String> {
                         }
                     });
                 }
+                Action::SplashDone => {
+                    if let Some(splash) = shell.splash.take() {
+                        let _ = splash.set_visible(false);
+                    }
+                    if let Some(hotel) = &shell.hotel {
+                        let _ = hotel.focus();
+                    }
+                }
                 Action::Smoke => {
                     if let Some(path) = &smoke_path {
-                        let url = client.webview.url().unwrap_or_default();
+                        let url = shell
+                            .hotel
+                            .as_ref()
+                            .and_then(|hotel| hotel.url().ok())
+                            .unwrap_or_default();
                         let ok = url.starts_with("http://") || url.starts_with("https://");
                         let text = format!(
                             "ok={}\r\nurl={url}\r\nversion={}\r\nchannel={}\r\n",
@@ -284,6 +597,25 @@ fn run(args: Vec<String>) -> Result<(), String> {
                         );
                         let _ = fs::write(path, text);
                     }
+                    persist(&shell, &mut settings, &dir, true);
+                    *control_flow = ControlFlow::Exit;
+                }
+                Action::Shot => {
+                    if let Some(path) = &shot_path {
+                        if let Err(error) = capture::capture_window(&shell.window, path) {
+                            eprintln!("could not capture the window: {error}");
+                        }
+                    }
+                    persist(&shell, &mut settings, &dir, true);
+                    *control_flow = ControlFlow::Exit;
+                }
+                Action::ShotLive => {
+                    if let Some(path) = &live_path {
+                        if let Err(error) = capture::capture_window(&shell.window, path) {
+                            eprintln!("could not capture the window: {error}");
+                        }
+                    }
+                    persist(&shell, &mut settings, &dir, true);
                     *control_flow = ControlFlow::Exit;
                 }
             },
@@ -292,36 +624,131 @@ fn run(args: Vec<String>) -> Result<(), String> {
     });
 }
 
+impl Shell {
+    fn status(&self, settings: &Settings) -> String {
+        let lang = Lang::new(settings.german);
+        if self.room.is_empty() {
+            lang.t("On habbo.si", "Auf habbo.si").to_string()
+        } else {
+            self.room.clone()
+        }
+    }
+
+    fn layout(&self) {
+        let scale = self.window.scale_factor();
+        let size = self.window.inner_size();
+        let width = size.width as f64 / scale;
+        let height = size.height as f64 / scale;
+        let bar = if self.fullscreen { 0.0 } else { BAR_HEIGHT };
+        let foot = if self.fullscreen { 0.0 } else { FOOTER_HEIGHT };
+        let middle = (height - bar - foot).max(0.0);
+
+        let _ = self.chrome.set_visible(!self.fullscreen);
+        let _ = self.footer.set_visible(!self.fullscreen);
+        let _ = self.chrome.set_bounds(rect(0.0, 0.0, width, bar));
+        let _ = self
+            .footer
+            .set_bounds(rect(0.0, bar + middle, width, foot));
+        if let Some(hotel) = &self.hotel {
+            let _ = hotel.set_bounds(rect(0.0, bar, width, middle));
+        }
+        if let Some(splash) = &self.splash {
+            let splash_width = SPLASH_WIDTH.min(width);
+            let splash_height = SPLASH_HEIGHT.min(height);
+            let _ = splash.set_bounds(rect(
+                (width - splash_width) / 2.0,
+                (height - splash_height) / 2.0,
+                splash_width,
+                splash_height,
+            ));
+        }
+    }
+
+    fn update_zoom_label(&self) {
+        let percent = (self.zoom * 100.0).round() as i64;
+        let _ = self
+            .chrome
+            .evaluate_script(&format!("window.setZoom && window.setZoom({percent});"));
+    }
+
+    fn update_max_icon(&self, maximized: bool) {
+        let _ = self.chrome.evaluate_script(&format!(
+            "window.setMaximized && window.setMaximized({maximized});"
+        ));
+    }
+
+    fn apply_zoom(&mut self) {
+        if let Some(hotel) = &self.hotel {
+            let _ = hotel.zoom(self.zoom);
+        }
+        self.update_zoom_label();
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
-fn handle_ipc(
+fn shell_action(
     message: &str,
-    client: &Client,
+    shell: &mut Shell,
     settings: &mut Settings,
     dir: &Path,
     proxy: &EventLoopProxy<Action>,
     target: &EventLoopWindowTarget<Action>,
     sheet: &mut Option<Sheet>,
     sheet_seq: &mut u64,
-    fullscreen: &mut bool,
-    fps: &mut Option<u32>,
-) {
-    if let Some(value) = message.strip_prefix("fps:") {
-        if let Ok(value) = value.parse::<u32>() {
-            *fps = Some(value);
-            set_window_title(client, settings, *fps);
-        }
-        return;
-    }
-
+    discord: &mut Discord,
+) -> bool {
     match message {
+        "drag" => {
+            let _ = shell.window.drag_window();
+        }
+        "resize-top" => {
+            let _ = shell.window.drag_resize_window(ResizeDirection::North);
+        }
+        "resize-bottom" => {
+            let _ = shell.window.drag_resize_window(ResizeDirection::South);
+        }
+        "resize-left" => {
+            let _ = shell.window.drag_resize_window(ResizeDirection::West);
+        }
+        "resize-right" => {
+            let _ = shell.window.drag_resize_window(ResizeDirection::East);
+        }
+        "resize-top-left" => {
+            let _ = shell.window.drag_resize_window(ResizeDirection::NorthWest);
+        }
+        "resize-top-right" => {
+            let _ = shell.window.drag_resize_window(ResizeDirection::NorthEast);
+        }
+        "resize-bottom-left" => {
+            let _ = shell.window.drag_resize_window(ResizeDirection::SouthWest);
+        }
+        "resize-bottom-right" => {
+            let _ = shell.window.drag_resize_window(ResizeDirection::SouthEast);
+        }
+        "minimize" => shell.window.set_minimized(true),
+        "maximize" => {
+            let maximized = shell.window.is_maximized();
+            shell.window.set_maximized(!maximized);
+            shell.update_max_icon(!maximized);
+        }
+        "close" => return true,
         "reload" => {
-            let _ = client.webview.reload();
+            if let Some(hotel) = &shell.hotel {
+                let _ = hotel.reload();
+                footer_set(
+                    &shell.footer,
+                    lang(settings).t("Reloading…", "Wird neu geladen…"),
+                    shell.fps,
+                    settings.showfps,
+                );
+            }
         }
         "settings" => {
             if let Some(current) = sheet.as_ref() {
                 current.window.set_focus();
-                return;
+                return false;
             }
+            let presence = discord.status();
             let id = next_sheet_id(sheet_seq);
             *sheet = open_sheet(
                 target,
@@ -331,52 +758,80 @@ fn handle_ipc(
                 "Settings — Habbo.si Client Beta",
                 900.0,
                 700.0,
-                pages::settings_page(settings),
+                pages::settings_page(settings, &presence),
                 None,
                 &dir.join("ui"),
             );
         }
-        "fullscreen" => {
-            *fullscreen = !*fullscreen;
-            client.window.set_fullscreen(if *fullscreen {
-                Some(Fullscreen::Borderless(None))
-            } else {
-                None
-            });
-        }
+        "fullscreen" => toggle_fullscreen(shell, settings),
         "leave-fullscreen" => {
-            if *fullscreen {
-                *fullscreen = false;
-                client.window.set_fullscreen(None);
+            if shell.fullscreen {
+                toggle_fullscreen(shell, settings);
             }
         }
         "devtools" => {
             if settings.devtools {
-                client.webview.open_devtools();
+                if let Some(hotel) = &shell.hotel {
+                    hotel.open_devtools();
+                }
             }
         }
-        "zoom-in" => zoom(client, settings, 0.1),
-        "zoom-out" => zoom(client, settings, -0.1),
+        "zoom-in" => {
+            shell.zoom = (shell.zoom + 0.1).clamp(0.5, 2.0);
+            shell.apply_zoom();
+        }
+        "zoom-out" => {
+            shell.zoom = (shell.zoom - 0.1).clamp(0.5, 2.0);
+            shell.apply_zoom();
+        }
         "zoom-reset" => {
-            settings.zoom = 1.0;
-            let _ = client.webview.zoom(settings.zoom);
+            shell.zoom = 1.0;
+            shell.apply_zoom();
+        }
+        "clear-cache" => {
+            let _ = settings::queue_cache_clear(dir);
+            footer_set(
+                &shell.footer,
+                lang(settings).t(
+                    "Cache clears on the next start",
+                    "Cache wird beim nächsten Start geleert",
+                ),
+                shell.fps,
+                settings.showfps,
+            );
         }
         _ => {}
     }
+    false
 }
 
-fn zoom(client: &Client, settings: &mut Settings, delta: f64) {
-    settings.zoom = (settings.zoom + delta).clamp(0.5, 2.0);
-    let _ = client.webview.zoom(settings.zoom);
+fn toggle_fullscreen(shell: &mut Shell, settings: &Settings) {
+    shell.fullscreen = !shell.fullscreen;
+    shell.window.set_fullscreen(if shell.fullscreen {
+        Some(Fullscreen::Borderless(None))
+    } else {
+        None
+    });
+    shell.layout();
+    if !shell.fullscreen {
+        footer_set(
+            &shell.footer,
+            &shell.status(settings),
+            shell.fps,
+            settings.showfps,
+        );
+    }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_sheet_message(
     message: &str,
     sheet: &Sheet,
-    client: &Client,
+    shell: &Shell,
     settings: &mut Settings,
     dir: &Path,
     proxy: &EventLoopProxy<Action>,
+    discord: &mut Discord,
 ) -> bool {
     let Ok(value) = serde_json::from_str::<serde_json::Value>(message) else {
         return false;
@@ -407,39 +862,96 @@ fn handle_sheet_message(
             }
             true
         }
+        "cache" => {
+            let _ = settings::queue_cache_clear(dir);
+            true
+        }
         "save" if sheet.kind == SheetKind::Settings => {
             if let Some(form) = value.get("form") {
                 if let Ok(form) = serde_json::from_value::<SettingsForm>(form.clone()) {
-                    let channel_changed = settings.channel
-                        != if form.channel.eq_ignore_ascii_case("beta") {
-                            "beta"
-                        } else {
-                            "stable"
-                        };
-                    settings.channel = if form.channel.eq_ignore_ascii_case("beta") {
-                        "beta".into()
-                    } else {
-                        "stable".into()
-                    };
-                    settings.gpu = form.gpu;
-                    settings.nothrottle = form.nothrottle;
-                    settings.unlockfps = form.unlockfps;
-                    settings.showfps = form.showfps;
-                    settings.devtools = form.devtools;
-                    let _ = settings::save(dir, settings);
-                    set_window_title(client, settings, None);
-                    if channel_changed {
-                        spawn_update_check(
-                            proxy.clone(),
-                            settings.beta_channel(),
-                            settings.seenrelease.clone(),
-                        );
-                    }
+                    apply_form(form, shell, settings, dir, discord);
                 }
             }
             true
         }
         _ => false,
+    }
+}
+
+fn apply_form(
+    form: SettingsForm,
+    shell: &Shell,
+    settings: &mut Settings,
+    dir: &Path,
+    discord: &mut Discord,
+) {
+    let previous_discord = settings.discord;
+    let previous_id = settings.discordid.clone();
+
+    settings.theme = match form.theme.to_ascii_lowercase().as_str() {
+        "light" => "light".into(),
+        "navy" => "navy".into(),
+        _ => "dark".into(),
+    };
+    settings.german = form.german;
+    settings.channel = if form.channel.eq_ignore_ascii_case("beta") {
+        "beta".into()
+    } else {
+        "stable".into()
+    };
+    settings.gpu = form.gpu;
+    settings.nothrottle = form.nothrottle;
+    settings.unlockfps = form.unlockfps;
+    settings.showfps = form.showfps;
+    settings.devtools = form.devtools;
+    settings.discord = form.discord;
+    settings.discordid = form.discordid.trim().to_string();
+    let _ = settings::save(dir, settings);
+
+    // Rebuild both chrome surfaces so the new theme and language apply immediately.
+    let _ = shell.chrome.load_html(&pages::chrome_page(settings));
+    let _ = shell.footer.load_html(&pages::footer_page(settings));
+    shell.window.set_theme(Some(window_theme(settings)));
+    footer_set(
+        &shell.footer,
+        lang(settings).t(
+            "Renderer switches apply after a restart",
+            "Renderer-Schalter gelten nach einem Neustart",
+        ),
+        None,
+        settings.showfps,
+    );
+
+    if settings.discord != previous_discord || settings.discordid != previous_id {
+        discord.stop();
+        start_presence(discord, settings);
+    }
+
+    let _ = shell;
+}
+
+fn start_presence(discord: &mut Discord, settings: &Settings) {
+    match discord::configure(settings) {
+        Some(id) => discord.start(&id),
+        None => discord.stop(),
+    }
+}
+
+fn footer_set(footer: &WebView, status: &str, fps: Option<u32>, show_fps: bool) {
+    let script = format!(
+        "window.setFooter && window.setFooter({}, {}, {});",
+        serde_json::to_string(status).unwrap_or_else(|_| "\"\"".into()),
+        fps.map(|value| value.to_string())
+            .unwrap_or_else(|| "null".into()),
+        show_fps
+    );
+    let _ = footer.evaluate_script(&script);
+}
+
+fn rect(x: f64, y: f64, width: f64, height: f64) -> Rect {
+    Rect {
+        position: LogicalPosition::new(x, y).into(),
+        size: LogicalSize::new(width, height).into(),
     }
 }
 
@@ -479,7 +991,7 @@ fn open_sheet(
         .with_background_color((11, 20, 32, 255))
         .with_devtools(false)
         .with_ipc_handler(move |request| {
-            let _ = ipc_proxy.send_event(Action::SheetMsg(id, request.body().to_string()));
+            let _ = ipc_proxy.send_event(Action::Sheet(id, request.body().to_string()));
         })
         .build(&window)
         .ok()?;
@@ -492,6 +1004,65 @@ fn open_sheet(
         _context: context,
         page_url,
     })
+}
+
+/// Renders a sheet to a PNG for design review (`--shot-settings`, `--shot-notes`).
+fn shot_sheet(
+    path: &str,
+    title: &str,
+    width: f64,
+    height: f64,
+    html: String,
+) -> Result<(), String> {
+    let event_loop = EventLoopBuilder::<Action>::with_user_event().build();
+    let proxy = event_loop.create_proxy();
+    let window = WindowBuilder::new()
+        .with_title(title)
+        .with_inner_size(LogicalSize::new(width, height))
+        .with_decorations(false)
+        .with_position(LogicalPosition::new(-20000.0, -20000.0))
+        .build(&event_loop)
+        .map_err(|error| format!("could not create the capture window: {error}"))?;
+
+    let ui_dir = std::env::temp_dir().join(format!("habbo-si-shot-{}", std::process::id()));
+    let _ = fs::create_dir_all(&ui_dir);
+    let mut context = WebContext::new(Some(ui_dir));
+    let webview = WebViewBuilder::new_with_web_context(&mut context)
+        .with_html(html)
+        .with_background_color((11, 20, 32, 255))
+        .build(&window)
+        .map_err(|error| format!("the capture surface could not start: {error}"))?;
+
+    let target = PathBuf::from(path);
+    {
+        let proxy = proxy.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(2200));
+            let _ = proxy.send_event(Action::Shot);
+        });
+    }
+
+    let _webview = webview;
+    let window_id = window.id();
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+        match event {
+            Event::WindowEvent {
+                window_id: closed,
+                event: WindowEvent::CloseRequested,
+                ..
+            } if closed == window_id => {
+                *control_flow = ControlFlow::Exit;
+            }
+            Event::UserEvent(Action::Shot) => {
+                if let Err(error) = capture::capture_window(&window, &target) {
+                    eprintln!("could not capture the sheet: {error}");
+                }
+                *control_flow = ControlFlow::Exit;
+            }
+            _ => {}
+        }
+    });
 }
 
 fn spawn_update_check(proxy: EventLoopProxy<Action>, beta: bool, seen: String) {
@@ -530,7 +1101,11 @@ fn write_update_check(args: &[String], path: &str) {
         info.as_ref()
             .map(|i| updates::has_update(i, beta))
             .unwrap_or(false),
-        if info.is_none() { "no release or network" } else { "" }
+        if info.is_none() {
+            "no release or network"
+        } else {
+            ""
+        }
     );
     if let Err(error) = fs::write(path, text) {
         eprintln!("could not write update check: {error}");
@@ -544,28 +1119,87 @@ fn write_release_notes(path: &str) {
         notes.as_ref().map(|n| n.tag.as_str()).unwrap_or(""),
         notes.as_ref().map(|n| n.name.as_str()).unwrap_or(""),
         notes.as_ref().map(|n| n.page.as_str()).unwrap_or(""),
-        notes.as_ref().map(|n| n.body.chars().count()).unwrap_or(0),
-        if notes.is_none() { "no notes or network" } else { "" }
+        notes
+            .as_ref()
+            .map(|n| n.body.chars().count())
+            .unwrap_or(0),
+        if notes.is_none() {
+            "no notes or network"
+        } else {
+            ""
+        }
     );
     if let Err(error) = fs::write(path, text) {
         eprintln!("could not write release notes: {error}");
     }
 }
 
-fn base_title() -> String {
-    format!("{} {} (Rust)", settings::NAME, settings::VERSION)
+fn write_probe(path: &Path, room_raw: &str, diag: &str) {
+    let detected = room::pick_room(&room::unquote(room_raw)).unwrap_or_default();
+    let text = format!(
+        "detected={detected}\r\nroom_probe={}\r\ndom={}\r\nframes=0\r\n",
+        room::unquote(room_raw),
+        room::unquote(diag)
+    );
+    let _ = fs::write(path, text);
 }
 
-fn set_window_title(client: &Client, settings: &Settings, fps: Option<u32>) {
-    let title = if settings.showfps {
-        match fps {
-            Some(fps) => format!("{} — {fps} FPS", base_title()),
-            None => base_title(),
-        }
+fn apply_overrides(settings: &mut Settings, args: &[String]) {
+    if let Some(channel) = settings::value(args, "--channel") {
+        settings.channel = if channel.eq_ignore_ascii_case("stable") {
+            "stable".into()
+        } else {
+            "beta".into()
+        };
+    }
+    if let Some(lang) = settings::value(args, "--lang") {
+        settings.german = lang.eq_ignore_ascii_case("de");
+    }
+    if let Some(theme) = settings::value(args, "--theme") {
+        settings.theme = match theme.to_ascii_lowercase().as_str() {
+            "light" => "light".into(),
+            "navy" => "navy".into(),
+            _ => "dark".into(),
+        };
+    }
+}
+
+fn predicted_language(settings: &Settings) -> Lang {
+    Lang::new(settings.german)
+}
+
+fn lang(settings: &Settings) -> Lang {
+    predicted_language(settings)
+}
+
+fn window_theme(settings: &Settings) -> tao::window::Theme {
+    if settings.theme == "light" {
+        tao::window::Theme::Light
     } else {
-        base_title()
-    };
-    client.window.set_title(&title);
+        tao::window::Theme::Dark
+    }
+}
+
+fn localized_starting(settings: &Settings) -> String {
+    lang(settings).t("Starting…", "Startet…").to_string()
+}
+
+fn persist(shell: &Shell, settings: &mut Settings, dir: &Path, preview: bool) {
+    settings.maximized = shell.window.is_maximized();
+    if !settings.maximized && !shell.fullscreen {
+        let scale = shell.window.scale_factor();
+        let size = shell.window.inner_size();
+        settings.width = (size.width as f64 / scale).round() as u32;
+        settings.height = (size.height as f64 / scale).round() as u32;
+    }
+    settings.zoom = shell.zoom;
+    if !preview {
+        let _ = settings::save(dir, settings);
+    }
+}
+
+fn base_title() -> String {
+    format!("{} {} (Rust)", settings::NAME, settings::VERSION)
 }
 
 fn icon() -> Option<Icon> {
@@ -600,6 +1234,7 @@ const INIT_SCRIPT: &str = r#"
       else if (command && key === '0') { event.preventDefault(); send('zoom-reset'); }
       else if (command && key === ',') { event.preventDefault(); send('settings'); }
     }, true);
+    window.addEventListener('load', function () { send('loaded'); });
   }
 
   if (window.__hscRustFps) return;

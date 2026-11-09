@@ -4,8 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const NAME: &str = "Habbo.si Client Beta";
-pub const VERSION: &str = "1.2.0-beta.2";
-pub const RELEASE_TAG: &str = "1.2.0-beta.2";
+pub const VERSION: &str = "1.2.0-beta.3";
+pub const RELEASE_TAG: &str = "1.2.0-beta.3";
 pub const BUILD_DATE: &str = "2026-11-08";
 pub const CLIENT_URL: &str = "https://habbo.si/client";
 pub const DATA_FOLDER: &str = "HabboSiClientBetaRust";
@@ -23,6 +23,8 @@ pub struct Settings {
     pub unlockfps: bool,
     pub showfps: bool,
     pub devtools: bool,
+    pub discord: bool,
+    pub discordid: String,
     pub channel: String,
     pub seenrelease: String,
     pub width: u32,
@@ -41,6 +43,8 @@ impl Default for Settings {
             unlockfps: true,
             showfps: true,
             devtools: false,
+            discord: true,
+            discordid: String::new(),
             channel: "beta".into(),
             seenrelease: String::new(),
             width: 1360,
@@ -89,12 +93,17 @@ impl Settings {
 
 #[derive(Debug, Deserialize)]
 pub struct SettingsForm {
+    pub theme: String,
+    pub german: bool,
     pub channel: String,
     pub gpu: bool,
     pub nothrottle: bool,
     pub unlockfps: bool,
     pub showfps: bool,
     pub devtools: bool,
+    pub discord: bool,
+    #[serde(default)]
+    pub discordid: String,
 }
 
 pub fn value<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
@@ -126,7 +135,38 @@ pub fn data_dir(args: &[String]) -> PathBuf {
 
 pub fn ensure(dir: &Path) {
     let _ = fs::create_dir_all(dir);
-    let _ = fs::create_dir_all(dir.join("WebView2"));
+    let _ = fs::create_dir_all(profile_dir(dir));
+    let _ = fs::create_dir_all(surface_dir(dir));
+}
+
+pub fn profile_dir(dir: &Path) -> PathBuf {
+    dir.join("WebView2")
+}
+
+/// The chrome, footer and splash share one profile, separate from the hotel surface.
+/// WebView2 refuses two environments over the same user data folder when their
+/// browser arguments differ, which the hotel surface needs for the renderer switches.
+pub fn surface_dir(dir: &Path) -> PathBuf {
+    dir.join("WebView2-surface")
+}
+
+pub fn clear_cache_marker(dir: &Path) -> PathBuf {
+    dir.join("clear-cache")
+}
+
+pub fn queue_cache_clear(dir: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dir)?;
+    fs::write(clear_cache_marker(dir), VERSION)
+}
+
+/// Called before WebView2 opens its profile. The running WebView2 owns the files,
+/// so clearing is deliberately deferred until the next launch.
+pub fn apply_pending_cache_clear(dir: &Path) {
+    if clear_cache_marker(dir).exists() {
+        let _ = fs::remove_dir_all(profile_dir(dir));
+        let _ = fs::remove_file(clear_cache_marker(dir));
+    }
+    let _ = fs::create_dir_all(profile_dir(dir));
 }
 
 pub fn settings_path(dir: &Path) -> PathBuf {
@@ -144,6 +184,10 @@ pub fn load(dir: &Path) -> Settings {
             if settings.channel != "beta" && settings.channel != "stable" {
                 settings.channel = "beta".into();
             }
+            if settings.theme != "light" && settings.theme != "navy" {
+                settings.theme = "dark".into();
+            }
+            settings.discordid = settings.discordid.trim().to_string();
             settings
         }
         Err(_) => Settings::default(),

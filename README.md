@@ -62,13 +62,13 @@ follow the stable or beta release feed from **Settings → Updates**.
 
 ### Rust beta port
 
-An in-progress native Rust port of the beta lives in [`rust/`](rust/README.md). It is a
-separate executable and profile — `Habbo.si Client Beta (Rust).exe` and
+A native Rust port of the beta lives in [`rust/`](rust/README.md). It is a separate
+executable and profile — `Habbo.si Client Beta (Rust).exe` and
 `%LOCALAPPDATA%\HabboSiClientBetaRust` — so it can run beside the C# beta without sharing
-a WebView2 session. The first milestone already hosts the hotel through `wry`/WebView2,
-carries the beta update feed, and has the settings, update and What's new sheets. The
-custom borderless chrome, Discord presence, language switch and release packaging are
-not ported yet. Build it with `./rust/build.sh`.
+a WebView2 session. It carries the same borderless chrome, dark/light/navy themes,
+English/German chrome, Discord Rich Presence, splash, settings/update/notes sheets, cache
+clearing and release feed as the C# beta, and ships with the same QA captures (`--shot`,
+`--probe`). Build it with `./rust/build.sh`.
 
 ## First start
 

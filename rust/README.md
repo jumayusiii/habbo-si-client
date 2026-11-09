@@ -1,8 +1,9 @@
 # Habbo.si Client — Rust beta port
 
-This is the first native Rust milestone of the beta client: a small Win32 window hosting
-WebView2 through `wry`, with the same hotel URL, beta identity and release feed as the C#
-`Habbo.si Client Beta`. It does **not** use .NET, WinForms, Tauri or a bundled browser.
+The native Rust beta client: a borderless Win32 window hosting three WebView2 surfaces
+through `wry` — the custom app bar, the hotel and the themed footer — with the same hotel
+URL, beta identity and release feed as the C# `Habbo.si Client Beta`. It does **not** use
+.NET, WinForms, Tauri or a bundled browser.
 
 The port is deliberately a separate application:
 
@@ -23,7 +24,7 @@ Requirements:
 - Windows 10 1903+ or Windows 11 with the Edge WebView2 Runtime.
 - Rust with the GNU Windows host (`x86_64-pc-windows-gnu`). The rustup GNU toolchain
   includes `rust-lld`, so no Visual Studio install is required.
-- MinGW-w64 binutils with `dlltool.exe` on `PATH`; [w64devkit](https://github.com/skeeto/w64devkit)
+- MinGW-w64 binutils with `dlltool.exe` and `windres.exe` on `PATH`; [w64devkit](https://github.com/skeeto/w64devkit)
   works and does not need to be installed system-wide. A full GCC is not required.
 - Git Bash for the build script.
 
@@ -42,60 +43,84 @@ dist/rust-beta/
 The executable is a normal windowed program. Keep `WebView2Loader.dll` beside it; the
 WebView2 runtime itself remains a shared Windows component.
 
-## What works in this milestone
+## Feature parity
 
-- Beta title and version (`1.2.0-beta.2`), separate profile, dark native window and app icon.
-- Persistent WebView2 profile with GPU rasterisation, zero-copy, unlocked frame pacing and
-  background-throttling switches matching the C# beta defaults.
-- Settings sheet (`Ctrl+,`) for the beta/stable update channel, renderer switches, FPS title
-  readout and developer tools. Settings are stored as JSON in the Rust profile.
-- Startup update check against the selected GitHub feed; a themed notice opens the release
-  page when a newer build exists. Nothing is downloaded or installed.
-- What's new sheet for the installed beta tag, shown once per Rust profile. Reopen it from
-  **Settings → Updates → Release notes**. The GitHub release body is converted to plain text
-  and rendered in a scrollable themed webview.
-- Hotkeys: `F5` reload, `F11` fullscreen, `Esc` leave fullscreen, `F12` devtools (when
-  enabled), `Ctrl` `+`/`-`/`0` zoom and `Ctrl+,` settings.
-- Window size/maximised state and zoom are remembered.
-- CLI parity for the release checks:
-  `--update-check <file>`, `--channel stable|beta`, `--release-notes <file>`, `--data <dir>`
-  and `--smoke <file>`.
+- **Borderless chrome** — the native frame is replaced by an HTML app bar with the HABBO
+  wordmark, `CLIENT`/`BETA` pills, zoom control, reload, settings, minimise, maximise and
+  close. Dragging and all eight resize edges are wired to `tao` window APIs, double-click
+  toggles maximise, and the footer is a second surface with room status, FPS and version.
+- **Themes** — dark, light and navy palettes shared by the chrome, footer and every sheet,
+  selectable in Settings and applied immediately.
+- **English / German** — every chrome string, sheet heading and status line follows the
+  language switch, matching the C# translations.
+- **Discord Rich Presence** — named-pipe IPC with app-ID validation, large artwork,
+  client version and the current room, title-cased the same way the C# client does it.
+  Disabled automatically for preview runs.
+- **Splash screen** — logo, gold rule and version fade over the hotel surface, then the
+  hotel takes focus.
+- **Cache clearing** — queued as a marker and applied on the next launch, because the
+  running WebView2 owns its profile while the client is open.
+- **Settings sheet** (`Ctrl+,`) — language, theme, renderer switches, beta/stable update
+  channel, FPS readout, developer tools, Discord toggle and application ID, profile folder,
+  cache clear and release notes. Stored as JSON in the Rust profile.
+- **Update and What's new sheets** — the selected GitHub feed is checked once per launch;
+  the release notes for the installed tag are rendered as plain text and shown once per
+  profile.
+- **Hotkeys** — `F5` reload, `F11` fullscreen, `Esc` leave fullscreen, `F12` devtools (when
+  enabled), `Ctrl` `+`/`-`/`0` zoom, `Ctrl+,` settings.
+- **Window state** — size, maximised state and zoom are remembered; preview runs never
+  overwrite them.
+- **CLI parity** — `--update-check <file>`, `--release-notes <file>`, `--presence-json <file>`,
+  `--smoke <file>`, `--channel stable|beta`, `--lang en|de`, `--theme dark|light|navy`,
+  `--data <dir>`, `--nosplash`, `--version`, plus the design/QA captures `--shot`,
+  `--shot-live`, `--shot-settings`, `--shot-notes` and the DOM diagnostics `--probe <file>`.
 
-## Not ported yet
+## Safety
 
-This is intentionally a starting point, not a claim of full parity. The custom borderless
-chrome and app bar, themed footer, Discord Rich Presence, English/German switching, splash,
-cache clearing, deterministic `--shot`/`--probe` tools and the release packaging still live
-only in the C# beta. The current Rust window uses the native Windows title bar. Those pieces
-can move over incrementally without changing the profile or update model.
+The executable embeds its icon, version resource and an `asInvoker` PerMonitorV2 manifest
+through `rust/build.rs` (`windres`), builds with thin LTO and a normal Rust panic strategy,
+and is scanned with Windows Defender before packaging. The binaries are **not code-signed**;
+SmartScreen may still ask for confirmation on first run, which is expected for an unsigned
+community build.
 
 ## Data and privacy
 
 ```
 %LOCALAPPDATA%\HabboSiClientBetaRust\
-├─ settings.json      channel, renderer switches, zoom and window state
-├─ WebView2\          hotel login, localStorage and asset cache
-└─ ui\                throw-away WebView2 profiles for the settings/notice sheets
+├─ settings.json        language, theme, channel, Discord, zoom and window state
+├─ WebView2\            hotel login, localStorage and asset cache
+├─ WebView2-surface\    chrome, footer and splash surfaces
+└─ ui\                  throw-away WebView2 profiles for the settings/notice sheets
 ```
 
-The only network traffic is the hotel itself, the selected GitHub release feed and the
-notes lookup after a build update. No account data is sent to GitHub; failures are silent
-and the client keeps working offline. `--data <dir>` points the whole profile somewhere
-else for testing.
+The hotel and the chrome use separate WebView2 user-data folders because WebView2 refuses
+two environments over one folder when their browser arguments differ — the hotel surface
+needs the renderer switches.
+
+The only network traffic is the hotel itself, the selected GitHub release feed, the notes
+lookup after a build update, and Discord when presence is enabled. No account data is sent
+to GitHub; failures are silent and the client keeps working offline. `--data <dir>` points
+the whole profile somewhere else for testing.
 
 ## Verification
 
 ```bash
-# feed lookup (writes the same fields as the C# tool)
-"dist/rust-beta/Habbo.si Client Beta (Rust).exe" --data .probe/rust-profile --update-check .probe/rust-update.txt
-cat .probe/rust-update.txt
+EXE="dist/rust-beta/Habbo.si Client Beta (Rust).exe"
 
-# notes for the installed tag
-"dist/rust-beta/Habbo.si Client Beta (Rust).exe" --release-notes .probe/rust-notes.txt
-
-# headless-ish startup check: opens the window, then exits after the first paint
-"dist/rust-beta/Habbo.si Client Beta (Rust).exe" --data .probe/rust-profile --smoke .probe/rust-smoke.txt
-cat .probe/rust-smoke.txt
+"$EXE" --version
+"$EXE" --presence-json .probe/rust-presence.json
+"$EXE" --data .probe/rust-profile --update-check .probe/rust-update.txt
+"$EXE" --data .probe/rust-profile --release-notes .probe/rust-notes.txt
+"$EXE" --data .probe/rust-profile --smoke .probe/rust-smoke.txt
+"$EXE" --data .probe/rust-profile --shot .probe/rust-shot.png --nosplash
+"$EXE" --data .probe/rust-profile --shot-live .probe/rust-live.png
+"$EXE" --data .probe/rust-profile --probe .probe/rust-probe.txt
 ```
 
-`--smoke` skips the update lookup so the check is deterministic.
+`--smoke`, `--shot`, `--shot-live` and `--probe` skip the update lookup and Discord so a
+check is deterministic, and they exit on their own. Unit tests cover the release-tag
+ordering, settings validation, room detection and the Discord payload:
+
+```bash
+cd rust && cargo test --release
+```
