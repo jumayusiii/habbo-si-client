@@ -78,6 +78,7 @@ struct Shell {
     _hotel_context: WebContext,
     _surface_context: WebContext,
     fullscreen: bool,
+    splash_active: bool,
     fps: Option<u32>,
     zoom: f64,
     room: String,
@@ -175,6 +176,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     let window = WindowBuilder::new()
         .with_title(&title)
         .with_decorations(false)
+        .with_visible(false)
         .with_transparent(false)
         .with_inner_size(logical)
         .with_min_inner_size(LogicalSize::new(980.0, 620.0))
@@ -193,6 +195,35 @@ fn run(args: Vec<String>) -> Result<(), String> {
     let height = size.height as f64 / scale;
     let middle = (height - BAR_HEIGHT - FOOTER_HEIGHT).max(0.0);
 
+    // Build the splash first and show the window as soon as it exists. The hotel, chrome
+    // and footer stay hidden until it is dismissed, so WebView2 startup happens behind the
+    // boot screen instead of leaving an empty client on screen for several seconds.
+    let splash = if show_splash {
+        let splash_width = SPLASH_WIDTH.min(width);
+        let splash_height = SPLASH_HEIGHT.min(height);
+        Some(
+            WebViewBuilder::new_with_web_context(&mut surface_context)
+                .with_html(pages::splash_page())
+                .with_bounds(rect(
+                    (width - splash_width) / 2.0,
+                    (height - splash_height) / 2.0,
+                    splash_width,
+                    splash_height,
+                ))
+                .with_background_color((30, 30, 30, 255))
+                .with_focused(false)
+                .build_as_child(&window)
+                .map_err(|error| format!("the splash screen could not start: {error}"))?,
+        )
+    } else {
+        None
+    };
+
+    if splash.is_some() {
+        window.set_visible(true);
+        window.set_focus();
+    }
+
     let hotel = if shot_path.is_some() {
         None
     } else {
@@ -202,6 +233,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
                 .with_url(settings::CLIENT_URL)
                 .with_background_color(theme::rgb(&settings.theme))
                 .with_bounds(rect(0.0, BAR_HEIGHT, width, middle))
+                .with_visible(!show_splash)
                 .with_devtools(true)
                 .with_clipboard(true)
                 .with_theme(web_theme(&settings))
@@ -222,6 +254,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         .with_html(pages::chrome_page(&settings))
         .with_bounds(rect(0.0, 0.0, width, BAR_HEIGHT))
         .with_background_color(theme::rgb(&settings.theme))
+        .with_visible(!show_splash)
         .with_focused(false)
         .with_ipc_handler(move |request| {
             let _ = chrome_proxy.send_event(Action::Chrome(request.body().to_string()));
@@ -233,30 +266,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
         .with_html(pages::footer_page(&settings))
         .with_bounds(rect(0.0, BAR_HEIGHT + middle, width, FOOTER_HEIGHT))
         .with_background_color(theme::rgb(&settings.theme))
+        .with_visible(!show_splash)
         .with_focused(false)
         .build_as_child(&window)
         .map_err(|error| format!("the client footer could not start: {error}"))?;
-
-    let splash = if show_splash {
-        let splash_width = SPLASH_WIDTH.min(width);
-        let splash_height = SPLASH_HEIGHT.min(height);
-        Some(
-            WebViewBuilder::new_with_web_context(&mut surface_context)
-                .with_html(pages::splash_page())
-                .with_bounds(rect(
-                    (width - splash_width) / 2.0,
-                    (height - splash_height) / 2.0,
-                    splash_width,
-                    splash_height,
-                ))
-                .with_background_color((11, 20, 32, 255))
-                .with_focused(false)
-                .build_as_child(&window)
-                .map_err(|error| format!("the splash screen could not start: {error}"))?,
-        )
-    } else {
-        None
-    };
 
     let mut shell = Shell {
         window,
@@ -267,6 +280,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         _hotel_context: hotel_context,
         _surface_context: surface_context,
         fullscreen: false,
+        splash_active: show_splash,
         fps: None,
         zoom: settings.zoom,
         room: String::new(),
@@ -279,6 +293,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
         None,
         settings.showfps,
     );
+    // Keep the window hidden until every surface exists, so the first visible frame is the
+    // splash rather than an empty client for the time WebView2 takes to initialise.
+    shell.window.set_visible(true);
+    shell.window.set_focus();
 
     let main_id = shell.window.id();
     let mut sheet: Option<Sheet> = None;
@@ -600,6 +618,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
                     if let Some(splash) = shell.splash.take() {
                         let _ = splash.set_visible(false);
                     }
+                    shell.splash_active = false;
+                    shell.layout();
                     if let Some(hotel) = &shell.hotel {
                         let _ = hotel.focus();
                     }
@@ -665,12 +685,13 @@ impl Shell {
         let bar = if self.fullscreen { 0.0 } else { BAR_HEIGHT };
         let foot = if self.fullscreen { 0.0 } else { FOOTER_HEIGHT };
         let middle = (height - bar - foot).max(0.0);
-
-        let _ = self.chrome.set_visible(!self.fullscreen);
-        let _ = self.footer.set_visible(!self.fullscreen);
+        let surfaces = !self.splash_active;
+        let _ = self.chrome.set_visible(surfaces && !self.fullscreen);
+        let _ = self.footer.set_visible(surfaces && !self.fullscreen);
         let _ = self.chrome.set_bounds(rect(0.0, 0.0, width, bar));
         let _ = self.footer.set_bounds(rect(0.0, bar + middle, width, foot));
         if let Some(hotel) = &self.hotel {
+            let _ = hotel.set_visible(surfaces);
             let _ = hotel.set_bounds(rect(0.0, bar, width, middle));
         }
         if let Some(splash) = &self.splash {

@@ -32,7 +32,7 @@ pub fn rgb(name: &str) -> (u8, u8, u8, u8) {
     if hex.len() == 6 {
         (channel(0), channel(2), channel(4), 255)
     } else {
-        (11, 20, 32, 255)
+        (30, 30, 30, 255)
     }
 }
 
@@ -71,20 +71,20 @@ pub fn palette(name: &str) -> Palette {
             rim: "#2a455f",
         },
         _ => Palette {
-            bg: "#0b1420",
-            bar: "#0e1928",
-            footer: "#0b1420",
-            card: "#111d2e",
-            card2: "#0e1827",
-            line: "#203047",
-            text: "#e6effc",
-            muted: "#8fa4c0",
-            dim: "#617691",
+            bg: "#1e1e1e",
+            bar: "#252526",
+            footer: "#1e1e1e",
+            card: "#252526",
+            card2: "#202020",
+            line: "#3a3a3a",
+            text: "#e8e8e8",
+            muted: "#a6a6a6",
+            dim: "#7d7d7d",
             gold: "#f6c452",
             green: "#56d68b",
-            toast: "#1b2c40",
-            toast_text: "#e6effc",
-            rim: "#2a3d56",
+            toast: "#2d2d2d",
+            toast_text: "#e8e8e8",
+            rim: "#4a4a4a",
         },
     }
 }
@@ -94,6 +94,28 @@ impl Palette {
         format!(
             "--bg:{};--bar:{};--footer:{};--card:{};--card2:{};--line:{};--text:{};\
              --muted:{};--dim:{};--gold:{};--green:{};--toast:{};--toast-text:{};--rim:{};",
+            self.bg,
+            self.bar,
+            self.footer,
+            self.card,
+            self.card2,
+            self.line,
+            self.text,
+            self.muted,
+            self.dim,
+            self.gold,
+            self.green,
+            self.toast,
+            self.toast_text,
+            self.rim
+        )
+    }
+
+    /// The palette as a JS object literal for the settings theme preview.
+    pub fn js(&self) -> String {
+        format!(
+            "{{bg:'{}',bar:'{}',footer:'{}',card:'{}',card2:'{}',line:'{}',text:'{}',\
+             muted:'{}',dim:'{}',gold:'{}',green:'{}',toast:'{}',toastText:'{}',rim:'{}'}}",
             self.bg,
             self.bar,
             self.footer,

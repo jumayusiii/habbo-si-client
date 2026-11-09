@@ -77,6 +77,14 @@ scan() {
 scan "$EXE"
 scan "$ZIP"
 
+# Only reached after both scans are clean: refresh the local beta folder too.
+DESKTOP="$(powershell.exe -NoProfile -Command "[Environment]::GetFolderPath('Desktop')" | tr -d '\r\n')"
+DESKTOP="$DESKTOP/Habbo.si Client Beta"
+if [ -d "$DESKTOP" ]; then
+  cp -f "$EXE" "$OUT/WebView2Loader.dll" "$ZIP" "$DESKTOP/"
+  echo "Desktop:  $DESKTOP"
+fi
+
 echo
 echo "Built:    $EXE"
 echo "Package:  $ZIP"

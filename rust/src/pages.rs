@@ -83,7 +83,7 @@ button.danger { color: #ff9a9a; }
 .langs button[aria-pressed=true], .themes button[aria-pressed=true] { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
 .themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 4px; }
 .themes button { height: 54px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-weight: 600; }
-.themes button.dark { background: #0b1420; color: #e6effc; }
+.themes button.dark { background: #1e1e1e; color: #e8e8e8; }
 .themes button.light { background: #f2f5f9; color: #142033; }
 .themes button.navy { background: #081426; color: #e6effc; }
 .foot { display: flex; justify-content: space-between; align-items: center; color: var(--dim); font-size: 11px; margin-top: 18px; }
@@ -275,15 +275,15 @@ pub fn footer_page(settings: &Settings) -> String {
 pub fn splash_page() -> String {
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><style>\
-         html,body{{margin:0;height:100%;background:#0b1420;color:#e6effc;overflow:hidden;\
+         html,body{{margin:0;height:100%;background:#1e1e1e;color:#e8e8e8;overflow:hidden;\
          font:13px \"Segoe UI\",sans-serif;}}\
          .splash{{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;\
-         animation:fade 1.35s ease forwards;}}\
+         animation:fade .45s ease;}}\
          .splash img{{width:310px;height:123px;object-fit:contain;image-rendering:pixelated;}}\
          .rule{{width:40px;height:2px;background:#f6c452;margin:24px 0 13px;}}\
-         .hotel{{letter-spacing:2.6px;font-size:9px;font-weight:700;color:#8fa4c0;}}\
-         .version{{margin-top:8px;font-size:10px;color:#617691;}}\
-         @keyframes fade{{0%{{opacity:0;transform:scale(.985)}}18%{{opacity:1;transform:scale(1)}}82%{{opacity:1}}100%{{opacity:0}}}}\
+         .hotel{{letter-spacing:2.6px;font-size:9px;font-weight:700;color:#a6a6a6;}}\
+         .version{{margin-top:8px;font-size:10px;color:#7d7d7d;}}\
+         @keyframes fade{{from{{opacity:0;transform:scale(.985)}}to{{opacity:1;transform:scale(1)}}}}\
          </style></head><body><div class=\"splash\"><img src=\"{}\" alt=\"HABBO\">\
          <div class=\"rule\"></div><div class=\"hotel\">HOTEL CLIENT</div>\
          <div class=\"version\">v{}</div></div></body></html>",
@@ -332,7 +332,7 @@ section h2{{margin:0 0 6px 2px;font-size:10px;font-weight:700;letter-spacing:1.5
 .themes{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 0 12px;}}
 .themes button{{height:62px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font:600 12px "Segoe UI",sans-serif;}}
 .themes button[aria-pressed="true"]{{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold);}}
-.themes button.dark{{background:#0b1420;color:#e6effc;}}
+.themes button.dark{{background:#1e1e1e;color:#e8e8e8;}}
 .themes button.light{{background:#f2f5f9;color:#142033;}}
 .themes button.navy{{background:#081426;color:#e6effc;}}
 .hint{{margin:6px 2px 0;color:var(--dim);font-size:11px;}}
@@ -465,9 +465,13 @@ button.ghost{{background:transparent;}}
         l.t("Save", "Speichern")
     ));
     page.push_str(&format!(
-        "const initialTheme = {}; const initialGerman = {};\n",
+        "const initialTheme = {}; const initialGerman = {};\n\
+         const themeVars = {{ dark: {}, light: {}, navy: {} }};\n",
         serde_json::to_string(&settings.theme).unwrap_or_else(|_| "\"dark\"".into()),
-        settings.german
+        settings.german,
+        palette("dark").js(),
+        palette("light").js(),
+        palette("navy").js()
     ));
     page.push_str(
         r#"
@@ -475,11 +479,7 @@ const q = (id) => document.getElementById(id);
 const send = (payload) => { try { window.ipc.postMessage(JSON.stringify(payload)); } catch (_) {} };
 document.querySelectorAll('[data-theme]').forEach((b) => b.addEventListener('click', () => {
   document.querySelectorAll('[data-theme]').forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
-  const vars = {
-    dark: { bg:'#0b1420', bar:'#0e1928', footer:'#0b1420', card:'#111d2e', card2:'#0e1827', line:'#203047', text:'#e6effc', muted:'#8fa4c0', dim:'#617691', gold:'#f6c452', green:'#56d68b', toast:'#1b2c40', toastText:'#e6effc', rim:'#2a3d56' },
-    light: { bg:'#f2f5f9', bar:'#ffffff', footer:'#eef2f7', card:'#ffffff', card2:'#f8fafc', line:'#d5dee9', text:'#142033', muted:'#5b6b80', dim:'#8494a8', gold:'#b47a00', green:'#18834d', toast:'#26374d', toastText:'#ffffff', rim:'#c5d0dd' },
-    navy: { bg:'#081426', bar:'#0d1d33', footer:'#081426', card:'#10233c', card2:'#0c1b30', line:'#1d3552', text:'#e6effc', muted:'#91a9c7', dim:'#66819f', gold:'#f6c452', green:'#56d68b', toast:'#1b304b', toastText:'#e6effc', rim:'#2a455f' }
-  }[b.dataset.theme];
+  const vars = themeVars[b.dataset.theme];
   const s = document.documentElement.style;
   Object.keys(vars).forEach((k) => s.setProperty('--' + (k === 'toastText' ? 'toast-text' : k), vars[k]));
   s.colorScheme = b.dataset.theme === 'light' ? 'light' : 'dark';
@@ -769,7 +769,14 @@ mod tests {
     fn window_backdrop_matches_the_theme() {
         assert_eq!(crate::theme::rgb("light"), (242, 245, 249, 255));
         assert_eq!(crate::theme::rgb("navy"), (8, 20, 38, 255));
-        assert_eq!(crate::theme::rgb("dark"), (11, 20, 32, 255));
+        assert_eq!(crate::theme::rgb("dark"), (30, 30, 30, 255));
+    }
+
+    #[test]
+    fn dark_palette_uses_the_neutral_grey() {
+        let page = settings_page(&Settings::default(), "off");
+        assert!(page.contains("bg:'#1e1e1e'"));
+        assert!(chrome_page(&Settings::default()).contains("--bg:#1e1e1e"));
     }
 
     #[test]
