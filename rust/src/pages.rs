@@ -363,9 +363,7 @@ button.ghost{{background:transparent;}}
 <div class="col">
 <section><h2>DISCORD</h2><div class="card">
 <label class="row"><div><div class="label">{}</div><div class="note">{}</div></div><input type="checkbox" id="discord"{}><span class="switch"></span></label>
-<div class="fieldrow"><input class="field" id="discordid" maxlength="20" placeholder="{}" value="{}"></div>
 <div class="status"><span class="dot{}"></span><span>{}</span></div>
-<div class="tools"><button class="act ghost" id="portal">{}</button></div>
 </div></section>
 <section><h2>{}</h2><div class="card">
 <label class="row"><div><div class="label">{}</div><div class="note">{}</div></div><input type="checkbox" id="channel"{}><span class="switch"></span></label>
@@ -426,14 +424,8 @@ button.ghost{{background:transparent;}}
             "Großes Artwork, Version und dein Raum – integriert"
         ),
         checked(settings.discord),
-        l.t(
-            "Built-in app (leave empty)",
-            "Integrierte App (leer lassen)"
-        ),
-        esc(&settings.discordid),
         if presence == "connected" { " on" } else { "" },
         esc(&presence_label(l, presence)),
-        l.t("Developer Portal", "Entwickler-Portal"),
         l.t("UPDATES", "UPDATES"),
         l.t("Beta channel", "Beta-Kanal"),
         l.t(
@@ -486,8 +478,7 @@ function save() {
     unlockfps: q('unlockfps').checked,
     showfps: q('showfps').checked,
     devtools: q('devtools').checked,
-    discord: q('discord').checked,
-    discordid: q('discordid').value.trim()
+    discord: q('discord').checked
   }});
 }
 q('save').addEventListener('click', save);
@@ -495,7 +486,6 @@ q('cancel').addEventListener('click', () => send({ action: 'close' }));
 q('close').addEventListener('click', () => send({ action: 'close' }));
 q('folder').addEventListener('click', () => send({ action: 'folder' }));
 q('notes').addEventListener('click', () => send({ action: 'notes' }));
-q('portal').addEventListener('click', () => send({ action: 'open', url: 'https://discord.com/developers/applications' }));
 q('cache').addEventListener('click', () => {
   if (confirm('Clear cached assets and the saved hotel session on the next start?')) send({ action: 'cache' });
 });
@@ -766,6 +756,14 @@ mod tests {
     }
 
     #[test]
+    fn discord_settings_only_expose_the_toggle() {
+        let page = settings_page(&Settings::default(), "off");
+        assert!(page.contains("id=\"discord\""));
+        assert!(!page.contains("discordid"));
+        assert!(!page.contains("id=\"portal\""));
+    }
+
+    #[test]
     fn settings_form_has_all_controls() {
         let page = settings_page(&Settings::default(), "off");
         for id in [
@@ -774,7 +772,6 @@ mod tests {
             "nothrottle",
             "channel",
             "discord",
-            "discordid",
             "cache",
             "save",
         ] {

@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 pub const NAME: &str = "Habbo.si Client Beta";
 /// The product name shown in Discord's artwork hover; the build channel stays out of it.
 pub const SHORT_NAME: &str = "Habbo.si Client";
-pub const VERSION: &str = "1.2.0-beta.4";
-pub const RELEASE_TAG: &str = "1.2.0-beta.4";
+pub const VERSION: &str = "1.2.0-beta.5";
+pub const RELEASE_TAG: &str = "1.2.0-beta.5";
 /// Stamped by `build.rs`, so the header always shows the binary it belongs to.
 pub const BUILD_DATE: &str = match option_env!("HSC_BUILD_DATE") {
     Some(value) => value,
@@ -33,7 +33,6 @@ pub struct Settings {
     pub showfps: bool,
     pub devtools: bool,
     pub discord: bool,
-    pub discordid: String,
     pub channel: String,
     pub seenrelease: String,
     pub width: u32,
@@ -52,7 +51,6 @@ impl Default for Settings {
             showfps: true,
             devtools: false,
             discord: true,
-            discordid: String::new(),
             channel: "beta".into(),
             seenrelease: String::new(),
             width: 1360,
@@ -103,8 +101,6 @@ pub struct SettingsForm {
     pub showfps: bool,
     pub devtools: bool,
     pub discord: bool,
-    #[serde(default)]
-    pub discordid: String,
 }
 
 pub fn value<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
@@ -187,7 +183,6 @@ pub fn load(dir: &Path) -> Settings {
             if settings.theme != "light" && settings.theme != "navy" {
                 settings.theme = "dark".into();
             }
-            settings.discordid = settings.discordid.trim().to_string();
             settings
         }
         Err(_) => Settings::default(),

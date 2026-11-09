@@ -377,26 +377,13 @@ fn write_frame(pipe: &mut File, opcode: u32, payload: &str) -> bool {
     pipe.write_all(&header).is_ok() && pipe.write_all(bytes).is_ok() && pipe.flush().is_ok()
 }
 
-/// Picks the custom application ID when the field holds a valid one, otherwise the ID
-/// this build ships with. An invalid or empty field therefore still gets a working
-/// presence instead of silently doing nothing.
-pub fn resolve_id(custom: &str, built_in: &str) -> Option<String> {
-    let custom = custom.trim();
-    if Discord::valid_id(custom) {
-        return Some(custom.to_string());
-    }
-    let built_in = built_in.trim();
-    if Discord::valid_id(built_in) {
-        return Some(built_in.to_string());
-    }
-    None
-}
-
+/// The presence always runs on the application this build ships with; the only setting
+/// left is the on/off toggle.
 pub fn configure(settings: &crate::settings::Settings) -> Option<String> {
-    if !settings.discord {
+    if !settings.discord || !Discord::valid_id(BUILT_IN_APP_ID) {
         return None;
     }
-    resolve_id(&settings.discordid, BUILT_IN_APP_ID)
+    Some(BUILT_IN_APP_ID.to_string())
 }
 
 pub fn presence_details(room: &str) -> String {
@@ -501,30 +488,11 @@ mod tests {
     }
 
     #[test]
-    fn presence_uses_the_built_in_app_by_default() {
+    fn presence_uses_the_built_in_app_unless_switched_off() {
         let mut settings = crate::settings::Settings::default();
         assert_eq!(configure(&settings), Some(BUILT_IN_APP_ID.to_string()));
-        settings.discordid = "76543210987654321".into();
-        assert_eq!(configure(&settings), Some("76543210987654321".to_string()));
         settings.discord = false;
         assert_eq!(configure(&settings), None);
-    }
-
-    #[test]
-    fn built_in_application_id_fills_in_without_a_custom_one() {
-        assert_eq!(
-            resolve_id("", "12345678901234567").as_deref(),
-            Some("12345678901234567")
-        );
-        assert_eq!(
-            resolve_id("  76543210987654321  ", "12345678901234567").as_deref(),
-            Some("76543210987654321")
-        );
-        assert_eq!(
-            resolve_id("not-an-id", "12345678901234567").as_deref(),
-            Some("12345678901234567")
-        );
-        assert_eq!(resolve_id("", ""), None);
     }
 
     #[test]

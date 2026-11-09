@@ -944,7 +944,6 @@ fn apply_form(
     proxy: &EventLoopProxy<Action>,
 ) {
     let previous_discord = settings.discord;
-    let previous_id = settings.discordid.clone();
 
     settings.theme = match form.theme.to_ascii_lowercase().as_str() {
         "light" => "light".into(),
@@ -963,7 +962,6 @@ fn apply_form(
     settings.showfps = form.showfps;
     settings.devtools = form.devtools;
     settings.discord = form.discord;
-    settings.discordid = form.discordid.trim().to_string();
     let _ = settings::save(dir, settings);
 
     // Rebuild both chrome surfaces so the new theme and language apply immediately.
@@ -978,7 +976,7 @@ fn apply_form(
         settings.showfps,
     );
 
-    if settings.discord != previous_discord || settings.discordid != previous_id {
+    if settings.discord != previous_discord {
         discord.stop();
         start_presence(discord, settings);
     }

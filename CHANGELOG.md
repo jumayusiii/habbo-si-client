@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0-beta.5 — 2026-11-09
+
+- Discord Rich Presence now always uses the client's built-in Discord application, so there is nothing to configure. The custom application-ID field, its saved setting and the Developer Portal link are gone from Settings; the presence toggle remains.
+- Version bumped to `1.2.0-beta.5`, so the header, artwork hover and build filenames follow the new tag.
+
 ## 1.2.0-beta.4 — 2026-11-09 (hotfix)
 
 - Dark theme rebuilt around `#1E1E1E`, with neutral grey surfaces, borders and muted text.
