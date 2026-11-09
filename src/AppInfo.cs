@@ -7,7 +7,7 @@ namespace HabboSiClient
         /// <summary>Beta builds are labelled, profiled and updated separately from stable.</summary>
         public const bool Beta = true;
         public const string Name = "Habbo.si Client Beta";
-        public const string Version = "1.2.0-beta.2";
+        public const string Version = "1.2.0-beta.3";
         public const string DataFolder = "HabboSiClientBeta";
 #else
         public const bool Beta = false;
@@ -17,11 +17,11 @@ namespace HabboSiClient
 #endif
 
         /// <summary>Date of the build that ships with this version, shown on the header pill.</summary>
-        public const string BuildDate = "2026-11-08";
+        public const string BuildDate = "2026-11-09";
 
         /// <summary>The published release that matches this build, used for its What's new notes.</summary>
 #if BETA
-        public const string ReleaseTag = "1.2.0-beta.2";
+        public const string ReleaseTag = "1.2.0-beta.3";
 #else
         public const string ReleaseTag = "1.1.5-hotfix2";
 #endif
