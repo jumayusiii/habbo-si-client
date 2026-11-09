@@ -8,6 +8,9 @@
 - Header restored to the CLIENT pill, with version and build date/time in its hover text; the BETA chip is gone.
 - Settings sheet is borderless, owned by the client, centred, keeps out of the taskbar and has a draggable header.
 - `rust/build.sh` now runs `cargo fmt --check` and refreshes the Desktop beta folder only after the Defender scans come back clean.
+- Splash paints at full opacity on its first visible frame: the CSS fade and its keyframes are gone, so the window never opens on a half-drawn logo.
+- Zoom removed from the client: the header control, the `Ctrl` `+` / `-` / `0` shortcuts, the saved zoom state and every WebView zoom call are gone; WebView2's built-in page zoom stays disabled.
+- Discord Rich Presence now retries and reconnects instead of giving up when the pipe is not ready, waits for Discord's READY handshake, answers PING frames, and keeps a stable elapsed timer.
 
 ## 1.2.0-beta.3 — 2026-11-09
 

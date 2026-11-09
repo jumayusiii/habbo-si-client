@@ -46,7 +46,7 @@ WebView2 runtime itself remains a shared Windows component.
 ## Feature parity
 
 - **Borderless chrome** — the native frame is replaced by an HTML app bar with the HABBO
-  wordmark, `CLIENT`/`BETA` pills, zoom control, reload, settings, minimise, maximise and
+  wordmark, `CLIENT`/`BETA` pills, reload, settings, minimise, maximise and
   close. Dragging and all eight resize edges are wired to `tao` window APIs, double-click
   toggles maximise, and the footer is a second surface with room status, FPS and version.
 - **Themes** — dark, light and navy palettes shared by the chrome, footer and every sheet,
@@ -67,8 +67,8 @@ WebView2 runtime itself remains a shared Windows component.
   the release notes for the installed tag are rendered as plain text and shown once per
   profile.
 - **Hotkeys** — `F5` reload, `F11` fullscreen, `Esc` leave fullscreen, `F12` devtools (when
-  enabled), `Ctrl` `+`/`-`/`0` zoom, `Ctrl+,` settings.
-- **Window state** — size, maximised state and zoom are remembered; preview runs never
+  enabled), `Ctrl+,` settings.
+- **Window state** — size and maximised state are remembered; preview runs never
   overwrite them.
 - **CLI parity** — `--update-check <file>`, `--release-notes <file>`, `--presence-json <file>`,
   `--smoke <file>`, `--channel stable|beta`, `--lang en|de`, `--theme dark|light|navy`,
@@ -87,7 +87,7 @@ community build.
 
 ```
 %LOCALAPPDATA%\HabboSiClientBetaRust\
-├─ settings.json        language, theme, channel, Discord, zoom and window state
+├─ settings.json        language, theme, channel, Discord and window state
 ├─ WebView2\            hotel login, localStorage and asset cache
 ├─ WebView2-surface\    chrome, footer and splash surfaces
 └─ ui\                  throw-away WebView2 profiles for the settings/notice sheets

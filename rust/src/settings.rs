@@ -25,7 +25,6 @@ pub const DATA_FOLDER: &str = "HabboSiClientBetaRust";
 pub struct Settings {
     pub theme: String,
     pub german: bool,
-    pub zoom: f64,
     pub gpu: bool,
     pub nothrottle: bool,
     pub unlockfps: bool,
@@ -45,7 +44,6 @@ impl Default for Settings {
         Self {
             theme: "dark".into(),
             german: false,
-            zoom: 1.0,
             gpu: true,
             nothrottle: true,
             unlockfps: true,
@@ -89,13 +87,6 @@ impl Settings {
         args.push("--disable-component-update");
         args.push("--autoplay-policy=no-user-gesture-required");
         args.join(" ")
-    }
-
-    pub fn clamp_zoom(&mut self) {
-        if !self.zoom.is_finite() {
-            self.zoom = 1.0;
-        }
-        self.zoom = self.zoom.clamp(0.5, 2.0);
     }
 }
 
@@ -188,7 +179,6 @@ pub fn load(dir: &Path) -> Settings {
     };
     match serde_json::from_str::<Settings>(&text) {
         Ok(mut settings) => {
-            settings.clamp_zoom();
             if settings.channel != "beta" && settings.channel != "stable" {
                 settings.channel = "beta".into();
             }
@@ -204,8 +194,7 @@ pub fn load(dir: &Path) -> Settings {
 
 pub fn save(dir: &Path, settings: &Settings) -> std::io::Result<()> {
     fs::create_dir_all(dir)?;
-    let mut settings = settings.clone();
-    settings.clamp_zoom();
+    let settings = settings.clone();
     let text = serde_json::to_string_pretty(&settings).unwrap_or_else(|_| "{}".into());
     fs::write(settings_path(dir), format!("{text}\n"))
 }
@@ -224,15 +213,5 @@ mod tests {
                 .count(),
             1
         );
-    }
-
-    #[test]
-    fn clamps_zoom() {
-        let mut s = Settings {
-            zoom: 5.0,
-            ..Settings::default()
-        };
-        s.clamp_zoom();
-        assert_eq!(s.zoom, 2.0);
     }
 }

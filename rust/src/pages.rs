@@ -171,17 +171,11 @@ pub fn chrome_page(settings: &Settings) -> String {
          button.win:hover.close{{background:#c42b1c;color:white;}}\
          svg{{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;\
          stroke-linecap:round;stroke-linejoin:round;}}\
-         .zoom{{display:flex;align-items:center;border:1px solid var(--line);border-radius:7px;\
-         height:30px;padding:0 2px;color:var(--dim);font-size:10px;}}\
-         .zoom button{{height:26px;min-width:22px;padding:0;}}\
-         .zoom span{{width:38px;text-align:center;font-size:10px;}}\
          .sep{{width:1px;height:22px;background:var(--line);margin:0 6px;}}\
          </style></head><body><div id=\"bar\">\
          <div class=\"brand\" id=\"drag\"><img src=\"{}\" alt=\"HABBO\">\
          <span class=\"chip\" title=\"{}\">CLIENT</span></div>\
          <div class=\"actions\">\
-         <div class=\"zoom\"><button data-act=\"zoom-out\" title=\"{}\">−</button><span id=\"zoom\">100%</span>\
-         <button data-act=\"zoom-in\" title=\"{}\">+</button></div>\
          <button data-act=\"reload\" title=\"{}\"><svg viewBox=\"0 0 24 24\"><path d=\"M20 11a8 8 0 0 0-14.8-4L3 10\"/><path d=\"M3 4v6h6\"/><path d=\"M4 13a8 8 0 0 0 14.8 4L21 14\"/><path d=\"M21 20v-6h-6\"/></svg></button>\
          <button data-act=\"settings\" title=\"{}\"><svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6V3h4v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z\"/></svg></button>\
          <div class=\"sep\"></div>\
@@ -194,8 +188,6 @@ pub fn chrome_page(settings: &Settings) -> String {
         p.css(),
         wordmark(),
         esc(&format!("{NAME} {VERSION} · {} {BUILD_TIME}", BUILD_DATE)),
-        esc(l.t("Zoom out", "Verkleinern")),
-        esc(l.t("Zoom in", "Vergrößern")),
         esc(l.t("Reload (F5)", "Neu laden (F5)")),
         esc(l.t("Settings (Ctrl+,)", "Einstellungen (Strg+,)")),
         esc(l.t("Minimize", "Minimieren")),
@@ -221,7 +213,6 @@ bar.addEventListener('dblclick', (event) => {
   if (!event.target.closest('button')) send('maximize');
 });
 document.addEventListener('contextmenu', (event) => event.preventDefault());
-window.setZoom = (value) => { document.getElementById('zoom').textContent = value + '%'; };
 window.setMaximized = (value) => {
   const max = document.getElementById('max');
   max.title = value ? 'Restore' : 'Maximize';
@@ -234,9 +225,6 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'F5') { event.preventDefault(); send('reload'); }
   else if (event.key === 'F11') { event.preventDefault(); send('fullscreen'); }
   else if (event.key === 'F12') { event.preventDefault(); send('devtools'); }
-  else if (command && (event.key === '+' || event.key === '=')) { event.preventDefault(); send('zoom-in'); }
-  else if (command && event.key === '-') { event.preventDefault(); send('zoom-out'); }
-  else if (command && event.key === '0') { event.preventDefault(); send('zoom-reset'); }
   else if (command && event.key === ',') { event.preventDefault(); send('settings'); }
 });
 "#,
@@ -277,13 +265,11 @@ pub fn splash_page() -> String {
         "<!doctype html><html><head><meta charset=\"utf-8\"><style>\
          html,body{{margin:0;height:100%;background:#1e1e1e;color:#e8e8e8;overflow:hidden;\
          font:13px \"Segoe UI\",sans-serif;}}\
-         .splash{{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;\
-         animation:fade .45s ease;}}\
+         .splash{{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;}}\
          .splash img{{width:310px;height:123px;object-fit:contain;image-rendering:pixelated;}}\
          .rule{{width:40px;height:2px;background:#f6c452;margin:24px 0 13px;}}\
          .hotel{{letter-spacing:2.6px;font-size:9px;font-weight:700;color:#a6a6a6;}}\
          .version{{margin-top:8px;font-size:10px;color:#7d7d7d;}}\
-         @keyframes fade{{from{{opacity:0;transform:scale(.985)}}to{{opacity:1;transform:scale(1)}}}}\
          </style></head><body><div class=\"splash\"><img src=\"{}\" alt=\"HABBO\">\
          <div class=\"rule\"></div><div class=\"hotel\">HOTEL CLIENT</div>\
          <div class=\"version\">v{}</div></div></body></html>",

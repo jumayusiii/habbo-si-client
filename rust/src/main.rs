@@ -80,7 +80,6 @@ struct Shell {
     fullscreen: bool,
     splash_active: bool,
     fps: Option<u32>,
-    zoom: f64,
     room: String,
 }
 
@@ -135,7 +134,6 @@ fn run(args: Vec<String>) -> Result<(), String> {
 
     let mut settings = settings::load(&dir);
     apply_overrides(&mut settings, &args);
-    settings.clamp_zoom();
 
     let shot_path = settings::value(&args, "--shot").map(PathBuf::from);
     let live_path = settings::value(&args, "--shot-live").map(PathBuf::from);
@@ -251,7 +249,6 @@ fn run(args: Vec<String>) -> Result<(), String> {
                 .map_err(|error| format!("WebView2 could not start: {error}"))?,
         )
     };
-    let _ = hotel.as_ref().map(|hotel| hotel.zoom(settings.zoom));
 
     let chrome_proxy = proxy.clone();
     let chrome = WebViewBuilder::new_with_web_context(&mut surface_context)
@@ -286,10 +283,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
         fullscreen: false,
         splash_active: show_splash,
         fps: None,
-        zoom: settings.zoom,
         room: String::new(),
     };
-    shell.update_zoom_label();
     shell.update_max_icon(settings.maximized);
     footer_set(
         &shell.footer,
@@ -436,7 +431,6 @@ fn run(args: Vec<String>) -> Result<(), String> {
                 }
                 Action::RefreshChrome => {
                     // The chrome reloads asynchronously after a theme or language change.
-                    shell.update_zoom_label();
                     shell.update_max_icon(shell.window.is_maximized());
                     footer_set(
                         &shell.footer,
@@ -710,24 +704,10 @@ impl Shell {
         }
     }
 
-    fn update_zoom_label(&self) {
-        let percent = (self.zoom * 100.0).round() as i64;
-        let _ = self
-            .chrome
-            .evaluate_script(&format!("window.setZoom && window.setZoom({percent});"));
-    }
-
     fn update_max_icon(&self, maximized: bool) {
         let _ = self.chrome.evaluate_script(&format!(
             "window.setMaximized && window.setMaximized({maximized});"
         ));
-    }
-
-    fn apply_zoom(&mut self) {
-        if let Some(hotel) = &self.hotel {
-            let _ = hotel.zoom(self.zoom);
-        }
-        self.update_zoom_label();
     }
 }
 
@@ -823,18 +803,6 @@ fn shell_action(
                     hotel.open_devtools();
                 }
             }
-        }
-        "zoom-in" => {
-            shell.zoom = (shell.zoom + 0.1).clamp(0.5, 2.0);
-            shell.apply_zoom();
-        }
-        "zoom-out" => {
-            shell.zoom = (shell.zoom - 0.1).clamp(0.5, 2.0);
-            shell.apply_zoom();
-        }
-        "zoom-reset" => {
-            shell.zoom = 1.0;
-            shell.apply_zoom();
         }
         "clear-cache" => {
             let _ = settings::queue_cache_clear(dir);
@@ -1014,8 +982,8 @@ fn apply_theme(shell: &Shell, settings: &Settings, proxy: &EventLoopProxy<Action
     shell
         .window
         .set_background_color(Some(theme::rgb(&settings.theme)));
-    // Reloading replaces the chrome document, so re-apply the live zoom and maximize state
-    // once the new page has run instead of leaving it at 100% and a restore icon.
+    // Reloading replaces the chrome document, so re-apply the maximize state once the new
+    // page has run instead of leaving it at a restore icon.
     let refresh = proxy.clone();
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(400));
@@ -1390,7 +1358,6 @@ fn persist(shell: &Shell, settings: &mut Settings, dir: &Path, preview: bool) {
         settings.width = (size.width as f64 / scale).round() as u32;
         settings.height = (size.height as f64 / scale).round() as u32;
     }
-    settings.zoom = shell.zoom;
     if !preview {
         let _ = settings::save(dir, settings);
     }
@@ -1427,9 +1394,6 @@ const INIT_SCRIPT: &str = r#"
       else if (key === 'F11') { event.preventDefault(); send('fullscreen'); }
       else if (key === 'Escape') { send('leave-fullscreen'); }
       else if (key === 'F12') { event.preventDefault(); send('devtools'); }
-      else if (command && (key === '+' || key === '=')) { event.preventDefault(); send('zoom-in'); }
-      else if (command && key === '-') { event.preventDefault(); send('zoom-out'); }
-      else if (command && key === '0') { event.preventDefault(); send('zoom-reset'); }
       else if (command && key === ',') { event.preventDefault(); send('settings'); }
     }, true);
     window.addEventListener('load', function () { send('loaded'); });
