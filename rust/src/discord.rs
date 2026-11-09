@@ -13,6 +13,10 @@ use crate::settings::{SHORT_NAME, VERSION};
 pub const ARTWORK_URL: &str =
     "https://raw.githubusercontent.com/jumayusiii/habbo-si-client/main/assets/logo.png";
 
+/// Application ID of the Habbo.si Discord application, baked in so presence works without
+/// the player registering an app. A valid ID typed into Settings still takes precedence.
+pub const BUILT_IN_APP_ID: &str = "1563961714989604955";
+
 /// Hover text on the large artwork: the short client name and the running build's version.
 pub fn large_text() -> String {
     format!("{SHORT_NAME} v{VERSION}")
@@ -373,16 +377,26 @@ fn write_frame(pipe: &mut File, opcode: u32, payload: &str) -> bool {
     pipe.write_all(&header).is_ok() && pipe.write_all(bytes).is_ok() && pipe.flush().is_ok()
 }
 
+/// Picks the custom application ID when the field holds a valid one, otherwise the ID
+/// this build ships with. An invalid or empty field therefore still gets a working
+/// presence instead of silently doing nothing.
+pub fn resolve_id(custom: &str, built_in: &str) -> Option<String> {
+    let custom = custom.trim();
+    if Discord::valid_id(custom) {
+        return Some(custom.to_string());
+    }
+    let built_in = built_in.trim();
+    if Discord::valid_id(built_in) {
+        return Some(built_in.to_string());
+    }
+    None
+}
+
 pub fn configure(settings: &crate::settings::Settings) -> Option<String> {
     if !settings.discord {
         return None;
     }
-    let custom = settings.discordid.trim();
-    if Discord::valid_id(custom) {
-        Some(custom.to_string())
-    } else {
-        None
-    }
+    resolve_id(&settings.discordid, BUILT_IN_APP_ID)
 }
 
 pub fn presence_details(room: &str) -> String {
@@ -479,6 +493,38 @@ mod tests {
         assert!(Discord::valid_id("12345678901234567"));
         assert!(!Discord::valid_id("123"));
         assert!(!Discord::valid_id("1234567890123456x"));
+    }
+
+    #[test]
+    fn ships_a_valid_built_in_application_id() {
+        assert!(Discord::valid_id(BUILT_IN_APP_ID));
+    }
+
+    #[test]
+    fn presence_uses_the_built_in_app_by_default() {
+        let mut settings = crate::settings::Settings::default();
+        assert_eq!(configure(&settings), Some(BUILT_IN_APP_ID.to_string()));
+        settings.discordid = "76543210987654321".into();
+        assert_eq!(configure(&settings), Some("76543210987654321".to_string()));
+        settings.discord = false;
+        assert_eq!(configure(&settings), None);
+    }
+
+    #[test]
+    fn built_in_application_id_fills_in_without_a_custom_one() {
+        assert_eq!(
+            resolve_id("", "12345678901234567").as_deref(),
+            Some("12345678901234567")
+        );
+        assert_eq!(
+            resolve_id("  76543210987654321  ", "12345678901234567").as_deref(),
+            Some("76543210987654321")
+        );
+        assert_eq!(
+            resolve_id("not-an-id", "12345678901234567").as_deref(),
+            Some("12345678901234567")
+        );
+        assert_eq!(resolve_id("", ""), None);
     }
 
     #[test]

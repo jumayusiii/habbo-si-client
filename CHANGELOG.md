@@ -14,6 +14,7 @@
 - Discord's big-artwork hover shows the short client name and the running build: `Habbo.si Client v1.2.0-beta.4`.
 - Discord presence follows the hotel in near real time: the room is probed immediately and every two seconds, clears back to `Exploring the hotel` when no room is visible, and the activity is refreshed on a 15-second heartbeat.
 - Room detection now runs in every hotel frame, not just the top document: each frame reports room changes to the top document, which forwards them over IPC, so a room header rendered in a subframe still reaches Discord.
+- Discord presence works with no setup: the build ships its own Discord application ID, so players only need Discord running. The Settings toggle still turns presence off, and the application field is optional for anyone who wants their own app.
 
 ## 1.2.0-beta.3 — 2026-11-09
 

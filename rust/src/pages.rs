@@ -422,13 +422,13 @@ button.ghost{{background:transparent;}}
         ),
         l.t("Discord Rich Presence", "Discord Rich Presence"),
         l.t(
-            "Big artwork, client version and your room",
-            "Großes Artwork, Version und dein Raum"
+            "Big artwork, client version and your room — built in",
+            "Großes Artwork, Version und dein Raum – integriert"
         ),
         checked(settings.discord),
         l.t(
-            "Discord application ID (17–20 digits)",
-            "Discord-Application-ID (17–20 Ziffern)"
+            "Built-in app (leave empty)",
+            "Integrierte App (leer lassen)"
         ),
         esc(&settings.discordid),
         if presence == "connected" { " on" } else { "" },

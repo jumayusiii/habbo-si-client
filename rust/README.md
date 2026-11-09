@@ -55,13 +55,16 @@ WebView2 runtime itself remains a shared Windows component.
   language switch, matching the C# translations.
 - **Discord Rich Presence** — named-pipe IPC with app-ID validation, large artwork,
   client version and the current room, title-cased the same way the C# client does it.
-  Disabled automatically for preview runs.
+  The build carries its own Discord application, so every player gets the presence with
+  no setup; the Settings toggle turns it off, and a custom ID is optional. Disabled
+  automatically for preview runs.
 - **Splash screen** — logo, gold rule and version fade over the hotel surface, then the
   hotel takes focus.
 - **Cache clearing** — queued as a marker and applied on the next launch, because the
   running WebView2 owns its profile while the client is open.
 - **Settings sheet** (`Ctrl+,`) — language, theme, renderer switches, beta/stable update
-  channel, FPS readout, developer tools, Discord toggle and application ID, profile folder,
+  channel, FPS readout, developer tools, Discord toggle and an optional custom
+  application ID (the built-in app is used when the field is empty), profile folder,
   cache clear and release notes. Stored as JSON in the Rust profile.
 - **Update and What's new sheets** — the selected GitHub feed is checked once per launch;
   the release notes for the installed tag are rendered as plain text and shown once per
