@@ -240,6 +240,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
                 .with_clipboard(true)
                 .with_theme(web_theme(&settings))
                 .with_hotkeys_zoom(false)
+                .with_initialization_script(&room::reporter_script())
                 .with_initialization_script(INIT_SCRIPT)
                 .with_additional_browser_args(&settings.browser_args())
                 .with_ipc_handler(move |request| {
@@ -453,6 +454,12 @@ fn run(args: Vec<String>) -> Result<(), String> {
                         }
                         return;
                     }
+                    // Every hotel frame reports its room to the top document, which forwards it
+                    // here as a plain name (empty when the room is gone).
+                    if let Some(value) = message.strip_prefix("room:") {
+                        let _ = proxy.send_event(Action::Room(value.to_string()));
+                        return;
+                    }
                     if message == "loaded" {
                         footer_set(
                             &shell.footer,
@@ -508,12 +515,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
                         sheet = None;
                     }
                 }
-                Action::Room(raw) => {
-                    let raw = room::unquote(&raw);
-                    // An empty probe means the hotel no longer exposes a room (navigator, login),
-                    // so the presence falls back to "Exploring the hotel" instead of freezing on
-                    // the last room the user visited.
-                    let found = room::pick_room(&raw).unwrap_or_default();
+                Action::Room(found) => {
+                    // An empty report means no hotel frame can see a room any more (navigator,
+                    // login), so the presence falls back to "Exploring the hotel" instead of
+                    // freezing on the last room the user visited.
                     if found != shell.room {
                         shell.room = found;
                         if presence_allowed && settings.discord {
@@ -531,10 +536,15 @@ fn run(args: Vec<String>) -> Result<(), String> {
                     }
                 }
                 Action::PollRoom => {
+                    // Fallback for builds where the frame reporter cannot run: this only ever
+                    // raises a room, it never clears one, so it cannot fight the subframes.
                     if let Some(hotel) = &shell.hotel {
                         let proxy = proxy.clone();
                         let _ = hotel.evaluate_script_with_callback(room::ROOM_JS, move |value| {
-                            let _ = proxy.send_event(Action::Room(value));
+                            let probe = room::unquote(&value);
+                            if let Some(found) = room::pick_room(&probe) {
+                                let _ = proxy.send_event(Action::Room(found));
+                            }
                         });
                     }
                 }
@@ -1387,6 +1397,15 @@ const INIT_SCRIPT: &str = r#"
   var send = function (message) {
     try { window.ipc.postMessage(message); } catch (_) {}
   };
+
+  if (!window.__hscRustRoom) {
+    window.__hscRustRoom = true;
+    window.addEventListener('message', function (event) {
+      var data = event.data;
+      if (!data || typeof data !== 'object' || typeof data.__hscRoom !== 'string') return;
+      send('room:' + data.__hscRoom);
+    });
+  }
 
   if (!window.__hscRustKeys) {
     window.__hscRustKeys = true;

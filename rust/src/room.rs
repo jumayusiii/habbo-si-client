@@ -124,6 +124,35 @@ pub fn pick_room(raw: &str) -> Option<String> {
     None
 }
 
+/// Injected into every frame the hotel creates. The room header is not always in the top
+/// document — the hotel client can live in a subframe — so each frame runs the probe and
+/// posts its room to the top document, which forwards it over IPC. Only changes are sent,
+/// and a frame that never sees a room stays silent instead of clearing another frame's room.
+pub fn reporter_script() -> String {
+    format!(
+        r#"(function () {{
+  if (window.__hscRoomReporter) return;
+  window.__hscRoomReporter = true;
+  var last = '';
+  function pick(raw) {{
+    try {{
+      var value = JSON.parse(raw);
+      return value.room || value.fiber || value.titleRoom || '';
+    }} catch (_) {{ return ''; }}
+  }}
+  function report() {{
+    var room = '';
+    try {{ room = pick({ROOM_JS}); }} catch (_) {{ return; }}
+    if (room === last) return;
+    last = room;
+    try {{ (window.top || window).postMessage({{ __hscRoom: room }}, '*'); }} catch (_) {{}}
+  }}
+  setTimeout(report, 500);
+  setInterval(report, 2000);
+}})();"#
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,6 +173,14 @@ mod tests {
             pick_room(r#"{"room":"Suite 42"}"#).as_deref(),
             Some("Suite 42")
         );
+    }
+
+    #[test]
+    fn reporter_posts_room_changes_to_the_top_frame() {
+        let script = reporter_script();
+        assert!(script.contains("__hscRoom"));
+        assert!(script.contains("postMessage"));
+        assert!(script.contains("data-room-name"));
     }
 
     #[test]
