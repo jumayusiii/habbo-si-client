@@ -220,6 +220,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
     };
 
     if splash.is_some() {
+        // WebView2 needs the thread's message pump to finish loading the local splash, so a
+        // plain sleep leaves it blank. Pump while the window is hidden, then show it already
+        // showing the boot screen instead of an empty backdrop.
+        pump_messages(Duration::from_millis(450));
         window.set_visible(true);
         window.set_focus();
     }
@@ -1042,6 +1046,52 @@ fn restore_open_sheet(
 ) {
     if let Some(mut current) = sheet.take() {
         restore_theme(&mut current, shell, settings, proxy);
+    }
+}
+
+/// Runs the thread's message queue for a short while so WebView2 can finish a navigation
+/// before the window becomes visible.
+fn pump_messages(duration: Duration) {
+    #[repr(C)]
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+    #[repr(C)]
+    struct Msg {
+        hwnd: isize,
+        message: u32,
+        wparam: usize,
+        lparam: isize,
+        time: u32,
+        pt: Point,
+        private: u32,
+    }
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn PeekMessageW(msg: *mut Msg, hwnd: isize, min: u32, max: u32, remove: u32) -> i32;
+        fn TranslateMessage(msg: *const Msg) -> i32;
+        fn DispatchMessageW(msg: *const Msg) -> isize;
+    }
+
+    let started = std::time::Instant::now();
+    while started.elapsed() < duration {
+        let mut msg = Msg {
+            hwnd: 0,
+            message: 0,
+            wparam: 0,
+            lparam: 0,
+            time: 0,
+            pt: Point { x: 0, y: 0 },
+            private: 0,
+        };
+        while unsafe { PeekMessageW(&mut msg, 0, 0, 0, 0x0001) } != 0 {
+            unsafe {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+        thread::sleep(Duration::from_millis(10));
     }
 }
 

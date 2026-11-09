@@ -3,7 +3,7 @@
 ## 1.2.0-beta.4 — 2026-11-09 (hotfix)
 
 - Dark theme rebuilt around `#1E1E1E`, with neutral grey surfaces, borders and muted text.
-- Splash screen now appears with the first window paint instead of after WebView2 initialises.
+- Splash screen now appears with the first window paint instead of after WebView2 initialises: the splash page is loaded with the thread's message pump before the window is shown, so there is no empty-backdrop lead-in.
 - Live theme preview in Settings: clicking a palette restyles the client immediately, and Cancel, Esc or closing the sheet restores the saved one.
 - Header restored to the CLIENT pill, with version and build date/time in its hover text; the BETA chip is gone.
 - Settings sheet is borderless, owned by the client, centred, keeps out of the taskbar and has a draggable header.
