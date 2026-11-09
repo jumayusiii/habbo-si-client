@@ -4,8 +4,8 @@
 1 24 "app.manifest"
 
 1 VERSIONINFO
- FILEVERSION 1,2,0,3
- PRODUCTVERSION 1,2,0,3
+ FILEVERSION 1,2,0,4
+ PRODUCTVERSION 1,2,0,4
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
@@ -18,12 +18,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Jumayusi"
             VALUE "FileDescription", "Habbo.si Client Beta (Rust)"
-            VALUE "FileVersion", "1.2.0.3"
+            VALUE "FileVersion", "1.2.0.4"
             VALUE "InternalName", "habbo-si-client-rust"
             VALUE "LegalCopyright", "Copyright (C) 2026 Jumayusi"
             VALUE "OriginalFilename", "Habbo.si Client Beta (Rust).exe"
             VALUE "ProductName", "Habbo.si Client Beta"
-            VALUE "ProductVersion", "1.2.0-beta.3"
+            VALUE "ProductVersion", "1.2.0-beta.4"
         END
     END
     BLOCK "VarFileInfo"

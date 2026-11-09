@@ -21,6 +21,12 @@ if [ -z "${CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER:-}" ]; then
   export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=rust-lld
 fi
 
+# Force a fresh build timestamp for the header pill on every packaged build.
+touch build.rs
+
+echo "Checking formatting…"
+cargo fmt --check
+
 echo "Building release binary…"
 cargo build --release
 

@@ -136,8 +136,14 @@ mod tests {
 
     #[test]
     fn ignores_generic_titles() {
-        assert_eq!(pick_room(r#"{"room":"Habbo","fiber":"","titleRoom":"Login"}"#), None);
-        assert_eq!(pick_room(r#"{"room":"Suite 42"}"#).as_deref(), Some("Suite 42"));
+        assert_eq!(
+            pick_room(r#"{"room":"Habbo","fiber":"","titleRoom":"Login"}"#),
+            None
+        );
+        assert_eq!(
+            pick_room(r#"{"room":"Suite 42"}"#).as_deref(),
+            Some("Suite 42")
+        );
     }
 
     #[test]

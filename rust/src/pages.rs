@@ -3,8 +3,8 @@ use base64::engine::general_purpose::STANDARD;
 use std::sync::OnceLock;
 
 use crate::lang::Lang;
-use crate::settings::{BUILD_DATE, NAME, Settings, VERSION};
-use crate::theme::{Palette, palette};
+use crate::settings::{BUILD_DATE, BUILD_TIME, NAME, Settings, VERSION};
+use crate::theme::{Palette, palette, scheme};
 use crate::updates::{ReleaseNotes, UpdateInfo};
 
 fn wordmark() -> &'static str {
@@ -31,7 +31,6 @@ fn checked(on: bool) -> &'static str {
 
 const CSS: &str = r#"
 :root {
-  color-scheme: dark;
   --bg: #0b1420;
   --bar: #0e1928;
   --footer: #0b1420;
@@ -102,14 +101,25 @@ a { color: var(--gold); }
 @media (max-width: 640px) { .wrap { padding: 16px; } .row { align-items: flex-start; } }
 "#;
 
-fn head(title: &str, p: &Palette) -> String {
+const SHEET_DRAG: &str = r#"<script>
+document.addEventListener('mousedown', function (event) {
+  if (event.button === 0 && event.clientY < 64 && !event.target.closest('button')) {
+    try { window.ipc.postMessage('drag'); } catch (_) {}
+  }
+});
+document.addEventListener('contextmenu', function (event) { event.preventDefault(); });
+</script>"#;
+
+fn head(title: &str, p: &Palette, scheme: &str) -> String {
     format!(
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\
-         <title>{}</title><style>{}\n:root{{{}}}</style></head><body>",
+         <title>{}</title><style>{}\n:root{{color-scheme:{};{}}}</style></head><body>{}",
         esc(title),
         CSS,
-        p.css()
+        scheme,
+        p.css(),
+        SHEET_DRAG
     )
 }
 
@@ -142,7 +152,7 @@ pub fn chrome_page(settings: &Settings) -> String {
     let p = theme(settings);
     let l = lang(settings);
     let mut page = format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><style>{}\n:root{{{}}}\
+        "<!doctype html><html><head><meta charset=\"utf-8\"><style>{}\n:root{{color-scheme:{};{}}}\
          html,body{{height:64px;overflow:hidden;margin:0;background:var(--bar);color:var(--text);\
          font:13px/1.2 \"Segoe UI\",sans-serif;user-select:none;}}\
          #bar{{height:64px;display:flex;align-items:center;gap:12px;padding:0 10px 0 22px;\
@@ -168,7 +178,7 @@ pub fn chrome_page(settings: &Settings) -> String {
          .sep{{width:1px;height:22px;background:var(--line);margin:0 6px;}}\
          </style></head><body><div id=\"bar\">\
          <div class=\"brand\" id=\"drag\"><img src=\"{}\" alt=\"HABBO\">\
-         <span class=\"chip\" title=\"{}\">CLIENT</span><span class=\"chip filled\" title=\"{}\">BETA</span></div>\
+         <span class=\"chip\" title=\"{}\">CLIENT</span></div>\
          <div class=\"actions\">\
          <div class=\"zoom\"><button data-act=\"zoom-out\" title=\"{}\">−</button><span id=\"zoom\">100%</span>\
          <button data-act=\"zoom-in\" title=\"{}\">+</button></div>\
@@ -180,10 +190,10 @@ pub fn chrome_page(settings: &Settings) -> String {
          <button class=\"win close\" data-act=\"close\" title=\"{}\"><svg viewBox=\"0 0 24 24\"><path d=\"M6 6l12 12M18 6L6 18\"/></svg></button>\
          </div></div><script>",
         CSS,
+        scheme(&settings.theme),
         p.css(),
         wordmark(),
-        esc(l.t("Client version", "Client-Version")),
-        esc(l.t("Beta channel build", "Beta-Kanal-Build")),
+        esc(&format!("{NAME} {VERSION} · {} {BUILD_TIME}", BUILD_DATE)),
         esc(l.t("Zoom out", "Verkleinern")),
         esc(l.t("Zoom in", "Vergrößern")),
         esc(l.t("Reload (F5)", "Neu laden (F5)")),
@@ -238,7 +248,7 @@ document.addEventListener('keydown', (event) => {
 pub fn footer_page(settings: &Settings) -> String {
     let p = theme(settings);
     format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><style>{}\n:root{{{}}}\
+        "<!doctype html><html><head><meta charset=\"utf-8\"><style>{}\n:root{{color-scheme:{};{}}}\
          html,body{{height:30px;overflow:hidden;margin:0;background:var(--footer);color:var(--dim);\
          font:11px/30px \"Segoe UI\",sans-serif;user-select:none;}}\
          #footer{{height:30px;display:flex;align-items:center;gap:14px;padding:0 18px;\
@@ -256,6 +266,7 @@ pub fn footer_page(settings: &Settings) -> String {
          }};\
          </script></body></html>",
         CSS,
+        scheme(&settings.theme),
         p.css(),
         VERSION
     )
@@ -285,68 +296,133 @@ pub fn settings_page(settings: &Settings, presence: &str) -> String {
     let p = theme(settings);
     let l = lang(settings);
     let mut page = head(
-        l.t("Settings — Habbo.si Client Beta", "Einstellungen — Habbo.si Client Beta"),
-        &p,
-    );
-    page.push_str("<div class=\"wrap\">");
-    page.push_str(&brand(l.t("SETTINGS", "EINSTELLUNGEN")));
-    page.push_str(&format!(
-        "<h1>{}</h1><p class=\"sub\">{}</p>",
-        l.t("Settings", "Einstellungen"),
         l.t(
-            "Renderer options, update channel and client tools.",
-            "Renderer-Optionen, Update-Kanal und Client-Werkzeuge."
-        )
-    ));
-
+            "Settings — Habbo.si Client Beta",
+            "Einstellungen — Habbo.si Client Beta",
+        ),
+        &p,
+        scheme(&settings.theme),
+    );
     page.push_str(&format!(
-        "<div class=\"card\"><h2>{}</h2>\
-         <div class=\"row\"><div><div class=\"label\">{}</div>\
-         <div class=\"note\">{}</div></div><div class=\"langs\">\
-         <button class=\"act\" data-lang=\"en\" aria-pressed=\"{}\">EN</button>\
-         <button class=\"act\" data-lang=\"de\" aria-pressed=\"{}\">DE</button></div></div>\
-         <div class=\"row\" style=\"display:block;cursor:default\"><div class=\"label\">{}</div>\
-         <div class=\"themes\">\
-         <button class=\"dark\" data-theme=\"dark\" aria-pressed=\"{}\">{}</button>\
-         <button class=\"light\" data-theme=\"light\" aria-pressed=\"{}\">{}</button>\
-         <button class=\"navy\" data-theme=\"navy\" aria-pressed=\"{}\">{}</button>\
-         </div></div></div>",
-        l.t("LANGUAGE & APPEARANCE", "SPRACHE & AUSSEHEN"),
-        l.t("Chrome language", "Sprache der Oberfläche"),
-        l.t("Applies to the client chrome and sheets.", "Gilt für Client-Oberfläche und Dialoge."),
+        r#"<style>
+html,body{{height:100%;overflow:hidden;}}
+body{{display:flex;flex-direction:column;background:var(--bg);}}
+.head{{flex:0 0 64px;display:flex;align-items:center;gap:12px;padding:0 10px 0 22px;border-bottom:1px solid var(--line);background:var(--bar);}}
+.head img{{width:116px;height:46px;object-fit:contain;pointer-events:none;}}
+.head .spacer{{flex:1;}}
+.langs{{display:inline-flex;height:28px;border:1px solid var(--line);border-radius:7px;overflow:hidden;}}
+.langs button{{border:0;background:transparent;color:var(--muted);font:600 11px "Segoe UI",sans-serif;padding:0 11px;cursor:pointer;}}
+.langs button[aria-pressed="true"]{{background:var(--gold);color:var(--bg);}}
+.winclose{{width:38px;height:30px;border:0;border-radius:6px;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}}
+.winclose:hover{{background:#c42b1c;color:#fff;}}
+.winclose svg{{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;}}
+.body{{flex:1;min-height:0;overflow:auto;padding:16px 22px 12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px 26px;align-content:start;}}
+.col{{display:flex;flex-direction:column;gap:14px;min-width:0;}}
+section h2{{margin:0 0 6px 2px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--dim);}}
+.card{{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:10px;padding:2px 14px;}}
+.row{{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:44px;padding:5px 0;cursor:pointer;}}
+.row + .row{{border-top:1px solid color-mix(in srgb,var(--line) 62%,transparent);}}
+.row .label{{font-size:13px;font-weight:600;line-height:1.25;}}
+.row .note{{color:var(--muted);font-size:11px;line-height:1.3;margin-top:1px;}}
+.row input[type=checkbox]{{position:absolute;opacity:0;pointer-events:none;}}
+.switch{{flex:0 0 auto;width:38px;height:21px;border-radius:999px;background:color-mix(in srgb,var(--line) 75%,var(--bg));position:relative;transition:background .15s;}}
+.switch::after{{content:"";position:absolute;width:15px;height:15px;border-radius:50%;background:var(--muted);top:3px;left:3px;transition:transform .15s,background .15s;}}
+.row input:checked + .switch{{background:var(--gold);}}
+.row input:checked + .switch::after{{transform:translateX(17px);background:var(--bg);}}
+.themes{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 0 12px;}}
+.themes button{{height:62px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font:600 12px "Segoe UI",sans-serif;}}
+.themes button[aria-pressed="true"]{{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold);}}
+.themes button.dark{{background:#0b1420;color:#e6effc;}}
+.themes button.light{{background:#f2f5f9;color:#142033;}}
+.themes button.navy{{background:#081426;color:#e6effc;}}
+.hint{{margin:6px 2px 0;color:var(--dim);font-size:11px;}}
+.fieldrow{{padding:4px 0 2px;}}
+.field{{width:100%;height:34px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--text);padding:0 10px;outline:none;font:12px "Segoe UI",sans-serif;}}
+.field:focus{{border-color:var(--gold);}}
+.status{{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:11px;padding:6px 0 4px;}}
+.dot{{width:6px;height:6px;border-radius:50%;background:var(--dim);}}
+.dot.on{{background:var(--gold);}}
+.tools{{display:flex;flex-wrap:wrap;gap:8px;padding:8px 0 10px;}}
+button.act{{appearance:none;border:1px solid var(--line);background:color-mix(in srgb,var(--card) 82%,var(--bg));color:var(--text);border-radius:7px;height:34px;padding:0 14px;font:600 12px "Segoe UI",sans-serif;cursor:pointer;}}
+button.act:hover{{border-color:var(--gold);}}
+button.primary{{background:var(--gold);color:var(--bg);border-color:var(--gold);}}
+button.ghost{{background:transparent;}}
+.foot{{flex:0 0 58px;display:flex;align-items:center;gap:8px;padding:0 22px;border-top:1px solid var(--line);background:var(--bar);}}
+.foot .spacer{{flex:1;}}
+.foot .stamp{{color:var(--dim);font-size:11px;}}
+::-webkit-scrollbar{{width:10px;}}
+::-webkit-scrollbar-track{{background:var(--bg);}}
+::-webkit-scrollbar-thumb{{background:var(--line);border-radius:8px;}}
+@media (max-width:700px){{.body{{grid-template-columns:minmax(0,1fr);}}}}
+</style>
+<div class="head"><img src="{}" alt="HABBO"><span class="chip">SETTINGS</span>
+<span class="spacer"></span>
+<div class="langs"><button data-lang="en" aria-pressed="{}">EN</button><button data-lang="de" aria-pressed="{}">DE</button></div>
+<button class="winclose" id="close" title="{}"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div class="body">
+<div class="col">
+<section><h2>{}</h2><div class="card"><div class="themes">
+<button class="dark" data-theme="dark" aria-pressed="{}">{}</button>
+<button class="light" data-theme="light" aria-pressed="{}">{}</button>
+<button class="navy" data-theme="navy" aria-pressed="{}">{}</button>
+</div></div></section>
+<section><h2>{}</h2><div class="card">
+<label class="row"><div><div class="label">{}</div><div class="note">{}</div></div><input type="checkbox" id="gpu"{}><span class="switch"></span></label>
+<label class="row"><div><div class="label">{}</div><div class="note">{}</div></div><input type="checkbox" id="unlockfps"{}><span class="switch"></span></label>
+<label class="row"><div><div class="label">{}</div><div class="note">{}</div></div><input type="checkbox" id="nothrottle"{}><span class="switch"></span></label>
+<label class="row"><div><div class="label">{}</div><div class="note">{}</div></div><input type="checkbox" id="showfps"{}><span class="switch"></span></label>
+<label class="row"><div><div class="label">{}</div><div class="note">{}</div></div><input type="checkbox" id="devtools"{}><span class="switch"></span></label>
+</div><p class="hint">{}</p></section>
+</div>
+<div class="col">
+<section><h2>DISCORD</h2><div class="card">
+<label class="row"><div><div class="label">{}</div><div class="note">{}</div></div><input type="checkbox" id="discord"{}><span class="switch"></span></label>
+<div class="fieldrow"><input class="field" id="discordid" maxlength="20" placeholder="{}" value="{}"></div>
+<div class="status"><span class="dot{}"></span><span>{}</span></div>
+<div class="tools"><button class="act ghost" id="portal">{}</button></div>
+</div></section>
+<section><h2>{}</h2><div class="card">
+<label class="row"><div><div class="label">{}</div><div class="note">{}</div></div><input type="checkbox" id="channel"{}><span class="switch"></span></label>
+<div class="tools"><button class="act ghost" id="notes">{}</button></div>
+</div></section>
+</div>
+</div>
+<div class="foot">
+<button class="act ghost" id="folder">{}</button>
+<button class="act ghost" id="cache">{}</button>
+<span class="spacer"></span>
+<span class="stamp">v{} · {} {}</span>
+<span class="spacer"></span>
+<button class="act" id="cancel">{}</button>
+<button class="act primary" id="save">{}</button>
+</div>
+<script>"#,
+        wordmark(),
         if settings.german { "false" } else { "true" },
         if settings.german { "true" } else { "false" },
-        l.t("Theme", "Design"),
+        esc(l.t("Close", "Schließen")),
+        l.t("APPEARANCE", "ERSCHEINUNGSBILD"),
         if settings.theme == "dark" { "true" } else { "false" },
         l.t("Dark", "Dunkel"),
         if settings.theme == "light" { "true" } else { "false" },
         l.t("Light", "Hell"),
         if settings.theme == "navy" { "true" } else { "false" },
-        l.t("Navy", "Marine")
-    ));
-
-    page.push_str(&format!(
-        "<div class=\"card\"><h2>{}</h2>\
-         <label class=\"row\"><div><div class=\"label\">{}</div>\
-         <div class=\"note\">{}</div></div><input type=\"checkbox\" id=\"gpu\"{}><span class=\"switch\"></span></label>\
-         <label class=\"row\"><div><div class=\"label\">{}</div>\
-         <div class=\"note\">{}</div></div><input type=\"checkbox\" id=\"unlockfps\"{}><span class=\"switch\"></span></label>\
-         <label class=\"row\"><div><div class=\"label\">{}</div>\
-         <div class=\"note\">{}</div></div><input type=\"checkbox\" id=\"nothrottle\"{}><span class=\"switch\"></span></label>\
-         <label class=\"row\"><div><div class=\"label\">{}</div>\
-         <div class=\"note\">{}</div></div><input type=\"checkbox\" id=\"showfps\"{}><span class=\"switch\"></span></label>\
-         <label class=\"row\"><div><div class=\"label\">{}</div>\
-         <div class=\"note\">{}</div></div><input type=\"checkbox\" id=\"devtools\"{}><span class=\"switch\"></span></label>\
-         <p class=\"sub\" style=\"margin:10px 0 0\">{}</p></div>",
+        l.t("Navy", "Marine"),
         l.t("PERFORMANCE", "LEISTUNG"),
         l.t("Hardware acceleration", "Hardware-Beschleunigung"),
-        l.t("GPU rasterisation for the hotel renderer", "GPU-Rasterisierung für den Hotel-Renderer"),
+        l.t(
+            "GPU rasterisation for the hotel renderer",
+            "GPU-Rasterisierung für den Hotel-Renderer"
+        ),
         checked(settings.gpu),
         l.t("Unlock frame rate", "Bildrate freigeben"),
         l.t("Uncapped renderer for 60–120 FPS", "Renderer ohne 60-FPS-Grenze"),
         checked(settings.unlockfps),
         l.t("Keep running in the background", "Im Hintergrund weiterlaufen"),
-        l.t("No timer throttling while the window is covered", "Kein Timer-Drosseln bei verdecktem Fenster"),
+        l.t(
+            "No timer throttling while the window is covered",
+            "Kein Timer-Drosseln bei verdecktem Fenster"
+        ),
         checked(settings.nothrottle),
         l.t("Show FPS", "FPS anzeigen"),
         l.t("Frame rate readout in the footer", "Bildrate in der Fußzeile"),
@@ -355,64 +431,39 @@ pub fn settings_page(settings: &Settings, presence: &str) -> String {
         l.t("Open the inspector with F12", "Den Inspector mit F12 öffnen"),
         checked(settings.devtools),
         l.t(
-            "Renderer switches take effect after a restart.",
-            "Renderer-Schalter werden nach einem Neustart wirksam."
-        )
-    ));
-
-    page.push_str(&format!(
-        "<div class=\"card\"><h2>{}</h2>\
-         <label class=\"row\"><div><div class=\"label\">{}</div>\
-         <div class=\"note\">{}</div></div><input type=\"checkbox\" id=\"channel\"{}><span class=\"switch\"></span></label>\
-         <div class=\"buttons\"><button class=\"act ghost\" id=\"notes\">{}</button></div></div>",
-        l.t("UPDATES", "UPDATES"),
-        l.t("Beta channel", "Beta-Kanal"),
-        l.t("Follow GitHub pre-releases instead of stable releases", "GitHub-Vorabversionen statt stabilen Releases folgen"),
-        checked(settings.beta_channel()),
-        l.t("Release notes", "Release-Notizen")
-    ));
-
-    page.push_str(&format!(
-        "<div class=\"card\"><h2>DISCORD RICH PRESENCE</h2>\
-         <label class=\"row\"><div><div class=\"label\">{}</div>\
-         <div class=\"note\">{}</div></div><input type=\"checkbox\" id=\"discord\"{}><span class=\"switch\"></span></label>\
-         <div class=\"fieldrow\"><input class=\"field\" id=\"discordid\" maxlength=\"20\" \
-         placeholder=\"{}\" value=\"{}\"></div>\
-         <div class=\"status\"><span class=\"dot{}\"></span><span>{}</span></div>\
-         <div class=\"buttons\"><button class=\"act ghost\" id=\"portal\">{}</button></div></div>",
+            "Restart the client to apply the renderer switches.",
+            "Für die Renderer-Schalter den Client neu starten."
+        ),
         l.t("Discord Rich Presence", "Discord Rich Presence"),
-        l.t("Big artwork, client version and your room", "Großes Artwork, Version und dein Raum"),
+        l.t(
+            "Big artwork, client version and your room",
+            "Großes Artwork, Version und dein Raum"
+        ),
         checked(settings.discord),
-        l.t("Discord application ID (17–20 digits)", "Discord-Application-ID (17–20 Ziffern)"),
+        l.t(
+            "Discord application ID (17–20 digits)",
+            "Discord-Application-ID (17–20 Ziffern)"
+        ),
         esc(&settings.discordid),
         if presence == "connected" { " on" } else { "" },
-        esc(presence),
-        l.t("Developer Portal", "Entwickler-Portal")
-    ));
-
-    page.push_str(&format!(
-        "<div class=\"card\"><h2>{}</h2>\
-         <p class=\"sub\" style=\"margin:0 0 10px\">{}</p>\
-         <div class=\"buttons\"><button class=\"act ghost\" id=\"folder\">{}</button>\
-         <button class=\"act danger\" id=\"cache\">{}</button></div></div>",
-        l.t("PROFILE & TOOLS", "PROFIL & WERKZEUGE"),
+        esc(&presence_label(l, presence)),
+        l.t("Developer Portal", "Entwickler-Portal"),
+        l.t("UPDATES", "UPDATES"),
+        l.t("Beta channel", "Beta-Kanal"),
         l.t(
-            "Cached assets and the saved session live in the Rust profile.",
-            "Cache und gespeicherte Sitzung liegen im Rust-Profil."
+            "Follow GitHub pre-releases",
+            "GitHub-Vorabversionen folgen"
         ),
+        checked(settings.beta_channel()),
+        l.t("Release notes", "Release-Notizen"),
         l.t("Open profile folder", "Profilordner"),
-        l.t("Clear cache", "Cache leeren")
-    ));
-
-    page.push_str(&format!(
-        "<div class=\"buttons\">\
-         <button class=\"act ghost\" id=\"cancel\">{}</button><span class=\"spacer\"></span>\
-         <button class=\"act primary\" id=\"save\">{}</button></div>",
+        l.t("Clear cache", "Cache leeren"),
+        VERSION,
+        BUILD_DATE,
+        BUILD_TIME,
         l.t("Cancel", "Abbrechen"),
         l.t("Save", "Speichern")
     ));
-    page.push_str(&foot());
-    page.push_str("</div><script>");
     page.push_str(&format!(
         "const initialTheme = {}; const initialGerman = {};\n",
         serde_json::to_string(&settings.theme).unwrap_or_else(|_| "\"dark\"".into()),
@@ -424,14 +475,15 @@ const q = (id) => document.getElementById(id);
 const send = (payload) => { try { window.ipc.postMessage(JSON.stringify(payload)); } catch (_) {} };
 document.querySelectorAll('[data-theme]').forEach((b) => b.addEventListener('click', () => {
   document.querySelectorAll('[data-theme]').forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
-  const theme = b.dataset.theme;
   const vars = {
     dark: { bg:'#0b1420', bar:'#0e1928', footer:'#0b1420', card:'#111d2e', card2:'#0e1827', line:'#203047', text:'#e6effc', muted:'#8fa4c0', dim:'#617691', gold:'#f6c452', green:'#56d68b', toast:'#1b2c40', toastText:'#e6effc', rim:'#2a3d56' },
     light: { bg:'#f2f5f9', bar:'#ffffff', footer:'#eef2f7', card:'#ffffff', card2:'#f8fafc', line:'#d5dee9', text:'#142033', muted:'#5b6b80', dim:'#8494a8', gold:'#b47a00', green:'#18834d', toast:'#26374d', toastText:'#ffffff', rim:'#c5d0dd' },
     navy: { bg:'#081426', bar:'#0d1d33', footer:'#081426', card:'#10233c', card2:'#0c1b30', line:'#1d3552', text:'#e6effc', muted:'#91a9c7', dim:'#66819f', gold:'#f6c452', green:'#56d68b', toast:'#1b304b', toastText:'#e6effc', rim:'#2a455f' }
-  }[theme];
+  }[b.dataset.theme];
   const s = document.documentElement.style;
   Object.keys(vars).forEach((k) => s.setProperty('--' + (k === 'toastText' ? 'toast-text' : k), vars[k]));
+  s.colorScheme = b.dataset.theme === 'light' ? 'light' : 'dark';
+  send({ action: 'preview', theme: b.dataset.theme });
 }));
 let german = initialGerman;
 document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => {
@@ -454,6 +506,7 @@ function save() {
 }
 q('save').addEventListener('click', save);
 q('cancel').addEventListener('click', () => send({ action: 'close' }));
+q('close').addEventListener('click', () => send({ action: 'close' }));
 q('folder').addEventListener('click', () => send({ action: 'folder' }));
 q('notes').addEventListener('click', () => send({ action: 'notes' }));
 q('portal').addEventListener('click', () => send({ action: 'open', url: 'https://discord.com/developers/applications' }));
@@ -470,10 +523,29 @@ document.addEventListener('keydown', (e) => {
     page
 }
 
+fn presence_label(l: Lang, presence: &str) -> &'static str {
+    match presence {
+        "connected" => l.t("Connected", "Verbunden"),
+        "connecting" => l.t("Connecting…", "Verbinde…"),
+        "no-discord" => l.t("Discord is not running", "Discord läuft nicht"),
+        "error" => l.t(
+            "Discord refused the connection",
+            "Discord hat die Verbindung abgelehnt",
+        ),
+        _ => l.t("Off", "Aus"),
+    }
+}
 pub fn update_page(info: &UpdateInfo, settings: &Settings) -> String {
     let p = theme(settings);
     let l = lang(settings);
-    let mut page = head(l.t("Update available — Habbo.si Client Beta", "Update verfügbar — Habbo.si Client Beta"), &p);
+    let mut page = head(
+        l.t(
+            "Update available — Habbo.si Client Beta",
+            "Update verfügbar — Habbo.si Client Beta",
+        ),
+        &p,
+        scheme(&settings.theme),
+    );
     page.push_str("<div class=\"wrap\">");
     page.push_str(&brand("UPDATE"));
     page.push_str(&format!(
@@ -520,14 +592,24 @@ document.addEventListener('keydown', (e) => {
 pub fn notes_page(notes: &ReleaseNotes, settings: &Settings) -> String {
     let p = theme(settings);
     let l = lang(settings);
-    let mut page = head(l.t("What's new — Habbo.si Client Beta", "Was ist neu — Habbo.si Client Beta"), &p);
+    let mut page = head(
+        l.t(
+            "What's new — Habbo.si Client Beta",
+            "Was ist neu — Habbo.si Client Beta",
+        ),
+        &p,
+        scheme(&settings.theme),
+    );
     page.push_str("<div class=\"wrap\">");
     page.push_str(&brand("WHAT'S NEW"));
     page.push_str(&format!(
         "<h1>{}</h1><p class=\"sub\">{} · {}</p>\
          <pre class=\"notes\">{}</pre>",
         esc(&notes.name),
-        l.t("Release notes for the build you are running", "Release-Notizen für deine Version"),
+        l.t(
+            "Release notes for the build you are running",
+            "Release-Notizen für deine Version"
+        ),
         esc(&notes.tag),
         esc(&plain_text(&notes.body))
     ));
@@ -560,7 +642,11 @@ document.addEventListener('keydown', (e) => {
 fn plain_text(markdown: &str) -> String {
     let mut out = String::new();
     let mut blank = true;
-    for raw in markdown.replace("\r\n", "\n").replace('\r', "\n").split('\n') {
+    for raw in markdown
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .split('\n')
+    {
         let mut line = raw.trim().to_string();
         if line == "---" || line == "***" || line == "___" {
             line.clear();
@@ -605,10 +691,14 @@ fn replace_links(text: &str) -> String {
     let mut rest = text;
     while let Some(start) = rest.find('[') {
         let after_start = &rest[start + 1..];
-        let Some(mid) = after_start.find("](") else { break };
+        let Some(mid) = after_start.find("](") else {
+            break;
+        };
         let label = &after_start[..mid];
         let after_mid = &after_start[mid + 2..];
-        let Some(end) = after_mid.find(')') else { break };
+        let Some(end) = after_mid.find(')') else {
+            break;
+        };
         out.push_str(&rest[..start]);
         out.push_str(label);
         out.push_str(" (");
@@ -643,13 +733,58 @@ mod tests {
 
     #[test]
     fn formats_links_and_headings() {
-        assert_eq!(plain_text("## Hi\n\n- [site](https://x.test)"), "Hi\n\n• site (https://x.test)");
+        assert_eq!(
+            plain_text("## Hi\n\n- [site](https://x.test)"),
+            "Hi\n\n• site (https://x.test)"
+        );
+    }
+
+    #[test]
+    fn header_shows_the_build_stamp() {
+        let page = chrome_page(&Settings::default());
+        assert!(page.contains(VERSION));
+        assert!(page.contains(BUILD_DATE));
+        assert!(page.contains(BUILD_TIME));
+        assert!(page.contains(">CLIENT</span>"));
+        assert!(!page.contains(">BETA</span>"));
+    }
+
+    #[test]
+    fn light_theme_switches_native_controls() {
+        let mut settings = Settings::default();
+        settings.theme = "light".into();
+        let chrome = chrome_page(&settings);
+        assert!(chrome.contains("color-scheme:light"));
+        assert!(!chrome.contains("color-scheme:dark"));
+        assert!(settings_page(&settings, "off").contains("color-scheme:light"));
+    }
+
+    #[test]
+    fn theme_tiles_preview_on_the_client() {
+        let page = settings_page(&Settings::default(), "off");
+        assert!(page.contains("action: 'preview'"));
+    }
+
+    #[test]
+    fn window_backdrop_matches_the_theme() {
+        assert_eq!(crate::theme::rgb("light"), (242, 245, 249, 255));
+        assert_eq!(crate::theme::rgb("navy"), (8, 20, 38, 255));
+        assert_eq!(crate::theme::rgb("dark"), (11, 20, 32, 255));
     }
 
     #[test]
     fn settings_form_has_all_controls() {
         let page = settings_page(&Settings::default(), "off");
-        for id in ["gpu", "unlockfps", "nothrottle", "channel", "discord", "discordid", "cache", "save"] {
+        for id in [
+            "gpu",
+            "unlockfps",
+            "nothrottle",
+            "channel",
+            "discord",
+            "discordid",
+            "cache",
+            "save",
+        ] {
             assert!(page.contains(&format!("id=\"{id}\"")));
         }
     }

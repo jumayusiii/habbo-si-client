@@ -4,9 +4,17 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const NAME: &str = "Habbo.si Client Beta";
-pub const VERSION: &str = "1.2.0-beta.3";
-pub const RELEASE_TAG: &str = "1.2.0-beta.3";
-pub const BUILD_DATE: &str = "2026-11-08";
+pub const VERSION: &str = "1.2.0-beta.4";
+pub const RELEASE_TAG: &str = "1.2.0-beta.4";
+/// Stamped by `build.rs`, so the header always shows the binary it belongs to.
+pub const BUILD_DATE: &str = match option_env!("HSC_BUILD_DATE") {
+    Some(value) => value,
+    None => "2026-11-08",
+};
+pub const BUILD_TIME: &str = match option_env!("HSC_BUILD_TIME") {
+    Some(value) => value,
+    None => "00:00",
+};
 pub const CLIENT_URL: &str = "https://habbo.si/client";
 pub const DATA_FOLDER: &str = "HabboSiClientBetaRust";
 
@@ -209,12 +217,21 @@ mod tests {
     #[test]
     fn defaults_to_beta() {
         assert!(Settings::default().beta_channel());
-        assert_eq!(Settings::default().browser_args().matches("--disable-frame-rate-limit").count(), 1);
+        assert_eq!(
+            Settings::default()
+                .browser_args()
+                .matches("--disable-frame-rate-limit")
+                .count(),
+            1
+        );
     }
 
     #[test]
     fn clamps_zoom() {
-        let mut s = Settings { zoom: 5.0, ..Settings::default() };
+        let mut s = Settings {
+            zoom: 5.0,
+            ..Settings::default()
+        };
         s.clamp_zoom();
         assert_eq!(s.zoom, 2.0);
     }

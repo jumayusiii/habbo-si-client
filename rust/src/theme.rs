@@ -16,6 +16,26 @@ pub struct Palette {
     pub rim: &'static str,
 }
 
+/// Which native control scheme a palette needs (`color-scheme`).
+pub fn scheme(name: &str) -> &'static str {
+    if name == "light" { "light" } else { "dark" }
+}
+
+/// The window backdrop for a palette, so a slow paint never flashes white in dark mode.
+pub fn rgb(name: &str) -> (u8, u8, u8, u8) {
+    let hex = palette(name).bg.trim_start_matches('#');
+    let channel = |start: usize| {
+        hex.get(start..start + 2)
+            .and_then(|part| u8::from_str_radix(part, 16).ok())
+            .unwrap_or(0)
+    };
+    if hex.len() == 6 {
+        (channel(0), channel(2), channel(4), 255)
+    } else {
+        (11, 20, 32, 255)
+    }
+}
+
 pub fn palette(name: &str) -> Palette {
     match name {
         "light" => Palette {

@@ -5,16 +5,12 @@
 //! hotel surface together, exactly like the C# client's `CaptureWindow`.
 
 #[cfg(windows)]
-pub fn capture_window(
-    window: &tao::window::Window,
-    path: &std::path::Path,
-) -> Result<(), String> {
+pub fn capture_window(window: &tao::window::Window, path: &std::path::Path) -> Result<(), String> {
     use tao::platform::windows::WindowExtWindows;
     use windows_sys::Win32::Foundation::{HWND, RECT};
     use windows_sys::Win32::Graphics::Gdi::{
-        BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CreateCompatibleBitmap, CreateCompatibleDC,
-        DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC, HGDIOBJ, ReleaseDC, SelectObject,
-        GetDIBits,
+        BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleBitmap, CreateCompatibleDC,
+        DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC, GetDIBits, HGDIOBJ, ReleaseDC, SelectObject,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
 
@@ -53,7 +49,6 @@ pub fn capture_window(
 
         let previous = SelectObject(memory, bitmap as HGDIOBJ);
         let _ = PrintWindow(hwnd, memory, PW_RENDERFULLCONTENT);
-
 
         let mut info: BITMAPINFO = std::mem::zeroed();
         info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;

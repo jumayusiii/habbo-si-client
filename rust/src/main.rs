@@ -14,13 +14,12 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use tao::dpi::{LogicalPosition, LogicalSize};
+use tao::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy, EventLoopWindowTarget};
+use tao::platform::windows::{WindowBuilderExtWindows, WindowExtWindows};
 use tao::window::{Fullscreen, Icon, ResizeDirection, Window, WindowBuilder};
-use wry::{
-    Rect, Theme as WebTheme, WebContext, WebView, WebViewBuilder, WebViewBuilderExtWindows,
-};
+use wry::{Rect, Theme as WebTheme, WebContext, WebView, WebViewBuilder, WebViewBuilderExtWindows};
 
 use discord::Discord;
 use lang::Lang;
@@ -44,6 +43,7 @@ enum Action {
     Update(updates::UpdateInfo),
     Notes(updates::ReleaseNotes),
     ShowNotes,
+    RefreshChrome,
     SplashDone,
     Smoke,
     Shot,
@@ -64,6 +64,9 @@ struct Sheet {
     window: Window,
     _context: WebContext,
     page_url: Option<String>,
+    /// The saved palette, captured on the first live preview so closing or
+    /// cancelling the sheet can put the client back exactly as it was.
+    preview_theme: Option<String>,
 }
 
 struct Shell {
@@ -137,29 +140,27 @@ fn run(args: Vec<String>) -> Result<(), String> {
     let live_path = settings::value(&args, "--shot-live").map(PathBuf::from);
     let smoke_path = settings::value(&args, "--smoke").map(PathBuf::from);
     let probe_path = settings::value(&args, "--probe").map(PathBuf::from);
-    let preview = shot_path.is_some()
-        || live_path.is_some()
-        || smoke_path.is_some()
-        || probe_path.is_some();
+    let preview =
+        shot_path.is_some() || live_path.is_some() || smoke_path.is_some() || probe_path.is_some();
     let presence_allowed = !preview;
     let show_splash = !preview && !settings::has(&args, "--nosplash");
 
     if let Some(path) = settings::value(&args, "--shot-settings") {
         let html = pages::settings_page(&settings, "off");
-        return shot_sheet(
-            path,
-            "Settings — Habbo.si Client Beta",
-            900.0,
-            700.0,
-            html,
-        );
+        return shot_sheet(path, "Settings — Habbo.si Client Beta", 900.0, 620.0, html);
     }
     if let Some(path) = settings::value(&args, "--shot-notes") {
         let Some(notes) = updates::current_notes() else {
             return Err("no release notes available".into());
         };
         let html = pages::notes_page(&notes, &settings);
-        return shot_sheet(path, "What's new — Habbo.si Client Beta", 700.0, 640.0, html);
+        return shot_sheet(
+            path,
+            "What's new — Habbo.si Client Beta",
+            700.0,
+            640.0,
+            html,
+        );
     }
 
     let event_loop = EventLoopBuilder::<Action>::with_user_event().build();
@@ -180,6 +181,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         .with_maximized(settings.maximized)
         .with_window_icon(icon())
         .with_theme(Some(window_theme(&settings)))
+        .with_background_color(theme::rgb(&settings.theme))
         .build(&event_loop)
         .map_err(|error| format!("could not create the window: {error}"))?;
 
@@ -198,11 +200,11 @@ fn run(args: Vec<String>) -> Result<(), String> {
         Some(
             WebViewBuilder::new_with_web_context(&mut hotel_context)
                 .with_url(settings::CLIENT_URL)
-                .with_background_color((11, 20, 32, 255))
+                .with_background_color(theme::rgb(&settings.theme))
                 .with_bounds(rect(0.0, BAR_HEIGHT, width, middle))
                 .with_devtools(true)
                 .with_clipboard(true)
-                .with_theme(WebTheme::Dark)
+                .with_theme(web_theme(&settings))
                 .with_hotkeys_zoom(false)
                 .with_initialization_script(INIT_SCRIPT)
                 .with_additional_browser_args(&settings.browser_args())
@@ -219,7 +221,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     let chrome = WebViewBuilder::new_with_web_context(&mut surface_context)
         .with_html(pages::chrome_page(&settings))
         .with_bounds(rect(0.0, 0.0, width, BAR_HEIGHT))
-        .with_background_color((14, 25, 40, 255))
+        .with_background_color(theme::rgb(&settings.theme))
         .with_focused(false)
         .with_ipc_handler(move |request| {
             let _ = chrome_proxy.send_event(Action::Chrome(request.body().to_string()));
@@ -230,7 +232,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     let footer = WebViewBuilder::new_with_web_context(&mut surface_context)
         .with_html(pages::footer_page(&settings))
         .with_bounds(rect(0.0, BAR_HEIGHT + middle, width, FOOTER_HEIGHT))
-        .with_background_color((11, 20, 32, 255))
+        .with_background_color(theme::rgb(&settings.theme))
         .with_focused(false)
         .build_as_child(&window)
         .map_err(|error| format!("the client footer could not start: {error}"))?;
@@ -271,7 +273,12 @@ fn run(args: Vec<String>) -> Result<(), String> {
     };
     shell.update_zoom_label();
     shell.update_max_icon(settings.maximized);
-    footer_set(&shell.footer, &localized_starting(&settings), None, settings.showfps);
+    footer_set(
+        &shell.footer,
+        &localized_starting(&settings),
+        None,
+        settings.showfps,
+    );
 
     let main_id = shell.window.id();
     let mut sheet: Option<Sheet> = None;
@@ -291,10 +298,12 @@ fn run(args: Vec<String>) -> Result<(), String> {
 
     if presence_allowed {
         let proxy = proxy.clone();
-        thread::spawn(move || loop {
-            thread::sleep(Duration::from_secs(4));
-            if proxy.send_event(Action::PollRoom).is_err() {
-                break;
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_secs(4));
+                if proxy.send_event(Action::PollRoom).is_err() {
+                    break;
+                }
             }
         });
     }
@@ -350,28 +359,25 @@ fn run(args: Vec<String>) -> Result<(), String> {
                 event: WindowEvent::CloseRequested,
                 ..
             } if window_id == main_id => {
+                restore_open_sheet(&mut sheet, &shell, &mut settings, &proxy);
                 persist(&shell, &mut settings, &dir, preview);
                 *control_flow = ControlFlow::Exit;
             }
             Event::WindowEvent {
-                window_id,
-                event,
-                ..
-            } if window_id == main_id => {
-                match event {
-                    WindowEvent::Resized(_) => {
-                        shell.layout();
-                        if !shell.fullscreen && !shell.window.is_maximized() {
-                            let scale = shell.window.scale_factor();
-                            let size = shell.window.inner_size();
-                            settings.width = (size.width as f64 / scale).round() as u32;
-                            settings.height = (size.height as f64 / scale).round() as u32;
-                        }
+                window_id, event, ..
+            } if window_id == main_id => match event {
+                WindowEvent::Resized(_) => {
+                    shell.layout();
+                    if !shell.fullscreen && !shell.window.is_maximized() {
+                        let scale = shell.window.scale_factor();
+                        let size = shell.window.inner_size();
+                        settings.width = (size.width as f64 / scale).round() as u32;
+                        settings.height = (size.height as f64 / scale).round() as u32;
                     }
-                    WindowEvent::ScaleFactorChanged { .. } => shell.layout(),
-                    _ => {}
                 }
-            }
+                WindowEvent::ScaleFactorChanged { .. } => shell.layout(),
+                _ => {}
+            },
             Event::WindowEvent {
                 window_id,
                 event: WindowEvent::CloseRequested,
@@ -382,7 +388,9 @@ fn run(args: Vec<String>) -> Result<(), String> {
                     .map(|current| current.window.id() == window_id)
                     .unwrap_or(false)
                 {
-                    sheet = None;
+                    if let Some(mut current) = sheet.take() {
+                        restore_theme(&mut current, &shell, &mut settings, &proxy);
+                    }
                 }
             }
             Event::UserEvent(action) => match action {
@@ -399,9 +407,21 @@ fn run(args: Vec<String>) -> Result<(), String> {
                         &mut discord,
                     );
                     if quit {
+                        restore_open_sheet(&mut sheet, &shell, &mut settings, &proxy);
                         persist(&shell, &mut settings, &dir, preview);
                         *control_flow = ControlFlow::Exit;
                     }
+                }
+                Action::RefreshChrome => {
+                    // The chrome reloads asynchronously after a theme or language change.
+                    shell.update_zoom_label();
+                    shell.update_max_icon(shell.window.is_maximized());
+                    footer_set(
+                        &shell.footer,
+                        &shell.status(&settings),
+                        shell.fps,
+                        settings.showfps,
+                    );
                 }
                 Action::Hotel(message) => {
                     if let Some(value) = message.strip_prefix("fps:") {
@@ -446,26 +466,27 @@ fn run(args: Vec<String>) -> Result<(), String> {
                         &mut discord,
                     );
                     if quit {
+                        restore_open_sheet(&mut sheet, &shell, &mut settings, &proxy);
                         persist(&shell, &mut settings, &dir, preview);
                         *control_flow = ControlFlow::Exit;
                     }
                 }
                 Action::Sheet(id, message) => {
-                    let close = sheet
-                        .as_ref()
-                        .filter(|current| current.id == id)
-                        .map(|current| {
-                            handle_sheet_message(
-                                &message,
-                                current,
-                                &shell,
-                                &mut settings,
-                                &dir,
-                                &proxy,
-                                &mut discord,
-                            )
-                        })
-                        .unwrap_or(false);
+                    let mut close = false;
+                    if let Some(current) = sheet.as_mut().filter(|current| current.id == id) {
+                        close = handle_sheet_message(
+                            &message,
+                            current,
+                            &shell,
+                            &mut settings,
+                            &dir,
+                            &proxy,
+                            &mut discord,
+                        );
+                        if close {
+                            restore_theme(current, &shell, &mut settings, &proxy);
+                        }
+                    }
                     if close {
                         sheet = None;
                     }
@@ -501,15 +522,13 @@ fn run(args: Vec<String>) -> Result<(), String> {
                 Action::Probe => {
                     if let Some(hotel) = &shell.hotel {
                         let room_proxy = proxy.clone();
-                        let _ =
-                            hotel.evaluate_script_with_callback(room::ROOM_JS, move |value| {
-                                let _ = room_proxy.send_event(Action::ProbeRoom(value));
-                            });
+                        let _ = hotel.evaluate_script_with_callback(room::ROOM_JS, move |value| {
+                            let _ = room_proxy.send_event(Action::ProbeRoom(value));
+                        });
                         let diag_proxy = proxy.clone();
-                        let _ =
-                            hotel.evaluate_script_with_callback(room::DIAG_JS, move |value| {
-                                let _ = diag_proxy.send_event(Action::ProbeDiag(value));
-                            });
+                        let _ = hotel.evaluate_script_with_callback(room::DIAG_JS, move |value| {
+                            let _ = diag_proxy.send_event(Action::ProbeDiag(value));
+                        });
                     }
                 }
                 Action::ProbeRoom(value) => {
@@ -532,6 +551,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
                         sheet = open_sheet(
                             target,
                             &proxy,
+                            &shell.window,
+                            &settings,
                             id,
                             SheetKind::Update,
                             "Update available — Habbo.si Client Beta",
@@ -549,6 +570,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
                         let opened = open_sheet(
                             target,
                             &proxy,
+                            &shell.window,
+                            &settings,
                             id,
                             SheetKind::Notes,
                             "What's new — Habbo.si Client Beta",
@@ -646,9 +669,7 @@ impl Shell {
         let _ = self.chrome.set_visible(!self.fullscreen);
         let _ = self.footer.set_visible(!self.fullscreen);
         let _ = self.chrome.set_bounds(rect(0.0, 0.0, width, bar));
-        let _ = self
-            .footer
-            .set_bounds(rect(0.0, bar + middle, width, foot));
+        let _ = self.footer.set_bounds(rect(0.0, bar + middle, width, foot));
         if let Some(hotel) = &self.hotel {
             let _ = hotel.set_bounds(rect(0.0, bar, width, middle));
         }
@@ -753,11 +774,13 @@ fn shell_action(
             *sheet = open_sheet(
                 target,
                 proxy,
+                &shell.window,
+                settings,
                 id,
                 SheetKind::Settings,
                 "Settings — Habbo.si Client Beta",
                 900.0,
-                700.0,
+                620.0,
                 pages::settings_page(settings, &presence),
                 None,
                 &dir.join("ui"),
@@ -826,13 +849,18 @@ fn toggle_fullscreen(shell: &mut Shell, settings: &Settings) {
 #[allow(clippy::too_many_arguments)]
 fn handle_sheet_message(
     message: &str,
-    sheet: &Sheet,
+    sheet: &mut Sheet,
     shell: &Shell,
     settings: &mut Settings,
     dir: &Path,
     proxy: &EventLoopProxy<Action>,
     discord: &mut Discord,
 ) -> bool {
+    // The sheet header doubles as its title bar, so a plain drag message has no JSON.
+    if message == "drag" {
+        let _ = sheet.window.drag_window();
+        return false;
+    }
     let Ok(value) = serde_json::from_str::<serde_json::Value>(message) else {
         return false;
     };
@@ -866,12 +894,35 @@ fn handle_sheet_message(
             let _ = settings::queue_cache_clear(dir);
             true
         }
+        "preview" if sheet.kind == SheetKind::Settings => {
+            let theme = match value
+                .get("theme")
+                .and_then(|v| v.as_str())
+                .unwrap_or("dark")
+                .to_ascii_lowercase()
+                .as_str()
+            {
+                "light" => "light",
+                "navy" => "navy",
+                _ => "dark",
+            };
+            if sheet.preview_theme.is_none() {
+                sheet.preview_theme = Some(settings.theme.clone());
+            }
+            if settings.theme != theme {
+                settings.theme = theme.into();
+                apply_theme(shell, settings, proxy);
+            }
+            false
+        }
         "save" if sheet.kind == SheetKind::Settings => {
             if let Some(form) = value.get("form") {
                 if let Ok(form) = serde_json::from_value::<SettingsForm>(form.clone()) {
-                    apply_form(form, shell, settings, dir, discord);
+                    apply_form(form, shell, settings, dir, discord, proxy);
                 }
             }
+            // Saving keeps the chosen palette; it must not be rolled back on close.
+            sheet.preview_theme = None;
             true
         }
         _ => false,
@@ -884,6 +935,7 @@ fn apply_form(
     settings: &mut Settings,
     dir: &Path,
     discord: &mut Discord,
+    proxy: &EventLoopProxy<Action>,
 ) {
     let previous_discord = settings.discord;
     let previous_id = settings.discordid.clone();
@@ -909,9 +961,7 @@ fn apply_form(
     let _ = settings::save(dir, settings);
 
     // Rebuild both chrome surfaces so the new theme and language apply immediately.
-    let _ = shell.chrome.load_html(&pages::chrome_page(settings));
-    let _ = shell.footer.load_html(&pages::footer_page(settings));
-    shell.window.set_theme(Some(window_theme(settings)));
+    apply_theme(shell, settings, proxy);
     footer_set(
         &shell.footer,
         lang(settings).t(
@@ -928,6 +978,50 @@ fn apply_form(
     }
 
     let _ = shell;
+}
+
+/// Rebuilds the client's themed surfaces from the in-memory settings, without saving.
+/// Used both after Save and for the settings sheet's live theme preview.
+fn apply_theme(shell: &Shell, settings: &Settings, proxy: &EventLoopProxy<Action>) {
+    let _ = shell.chrome.load_html(&pages::chrome_page(settings));
+    let _ = shell.footer.load_html(&pages::footer_page(settings));
+    shell.window.set_theme(Some(window_theme(settings)));
+    shell
+        .window
+        .set_background_color(Some(theme::rgb(&settings.theme)));
+    // Reloading replaces the chrome document, so re-apply the live zoom and maximize state
+    // once the new page has run instead of leaving it at 100% and a restore icon.
+    let refresh = proxy.clone();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(400));
+        let _ = refresh.send_event(Action::RefreshChrome);
+    });
+}
+
+/// Puts the palette back to the value it had when the sheet first previewed.
+fn restore_theme(
+    sheet: &mut Sheet,
+    shell: &Shell,
+    settings: &mut Settings,
+    proxy: &EventLoopProxy<Action>,
+) {
+    if let Some(original) = sheet.preview_theme.take() {
+        settings.theme = original;
+        apply_theme(shell, settings, proxy);
+    }
+}
+
+/// Drops an open sheet after putting its preview back, so quitting never saves a transient
+/// palette the user never confirmed.
+fn restore_open_sheet(
+    sheet: &mut Option<Sheet>,
+    shell: &Shell,
+    settings: &mut Settings,
+    proxy: &EventLoopProxy<Action>,
+) {
+    if let Some(mut current) = sheet.take() {
+        restore_theme(&mut current, shell, settings, proxy);
+    }
 }
 
 fn start_presence(discord: &mut Discord, settings: &Settings) {
@@ -964,6 +1058,8 @@ fn next_sheet_id(seq: &mut u64) -> u64 {
 fn open_sheet(
     target: &EventLoopWindowTarget<Action>,
     proxy: &EventLoopProxy<Action>,
+    parent: &Window,
+    app: &Settings,
     id: u64,
     kind: SheetKind,
     title: &str,
@@ -973,14 +1069,38 @@ fn open_sheet(
     page_url: Option<String>,
     ui_root: &Path,
 ) -> Option<Sheet> {
+    // Sheets are part of the client, not separate apps: no native frame, no taskbar
+    // button, and centred over the window they belong to.
+    let scale = parent.scale_factor();
+    let parent_pos = parent
+        .outer_position()
+        .unwrap_or(PhysicalPosition::new(0, 0));
+    let parent_size = parent.outer_size();
+    let sheet_width = (width * scale).round() as i32;
+    let sheet_height = (height * scale).round() as i32;
+    let x = parent_pos.x + (parent_size.width as i32 - sheet_width) / 2;
+    let y = parent_pos.y + (parent_size.height as i32 - sheet_height) / 2;
+
     let window = WindowBuilder::new()
         .with_title(title)
         .with_inner_size(LogicalSize::new(width, height))
-        .with_min_inner_size(LogicalSize::new(520.0, 260.0))
-        .with_resizable(true)
-        .with_theme(Some(tao::window::Theme::Dark))
+        .with_position(PhysicalPosition::new(x, y))
+        .with_decorations(false)
+        .with_resizable(false)
+        .with_skip_taskbar(true)
+        .with_owner_window(parent.hwnd())
+        .with_background_color(theme::rgb(&app.theme))
+        .with_theme(Some(window_theme(app)))
         .build(target)
         .ok()?;
+
+    // A frame-less window still carries invisible resize borders, so centre it on the
+    // real outer size once Windows has decided them.
+    let outer = window.outer_size();
+    window.set_outer_position(PhysicalPosition::new(
+        parent_pos.x + (parent_size.width as i32 - outer.width as i32) / 2,
+        parent_pos.y + (parent_size.height as i32 - outer.height as i32) / 2,
+    ));
 
     let ui_dir = ui_root.join(format!("ui-{id}"));
     let _ = fs::create_dir_all(&ui_dir);
@@ -988,7 +1108,8 @@ fn open_sheet(
     let ipc_proxy = proxy.clone();
     let webview = WebViewBuilder::new_with_web_context(&mut context)
         .with_html(html)
-        .with_background_color((11, 20, 32, 255))
+        .with_background_color(theme::rgb(&app.theme))
+        .with_theme(web_theme(app))
         .with_devtools(false)
         .with_ipc_handler(move |request| {
             let _ = ipc_proxy.send_event(Action::Sheet(id, request.body().to_string()));
@@ -1003,6 +1124,7 @@ fn open_sheet(
         window,
         _context: context,
         page_url,
+        preview_theme: None,
     })
 }
 
@@ -1119,10 +1241,7 @@ fn write_release_notes(path: &str) {
         notes.as_ref().map(|n| n.tag.as_str()).unwrap_or(""),
         notes.as_ref().map(|n| n.name.as_str()).unwrap_or(""),
         notes.as_ref().map(|n| n.page.as_str()).unwrap_or(""),
-        notes
-            .as_ref()
-            .map(|n| n.body.chars().count())
-            .unwrap_or(0),
+        notes.as_ref().map(|n| n.body.chars().count()).unwrap_or(0),
         if notes.is_none() {
             "no notes or network"
         } else {
@@ -1177,6 +1296,14 @@ fn window_theme(settings: &Settings) -> tao::window::Theme {
         tao::window::Theme::Light
     } else {
         tao::window::Theme::Dark
+    }
+}
+
+fn web_theme(settings: &Settings) -> WebTheme {
+    if settings.theme == "light" {
+        WebTheme::Light
+    } else {
+        WebTheme::Dark
     }
 }
 

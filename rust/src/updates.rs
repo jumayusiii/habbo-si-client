@@ -14,7 +14,11 @@ pub struct UpdateInfo {
 
 impl UpdateInfo {
     pub fn display(&self) -> &str {
-        if self.tag.is_empty() { &self.latest } else { &self.tag }
+        if self.tag.is_empty() {
+            &self.latest
+        } else {
+            &self.tag
+        }
     }
 }
 
@@ -158,7 +162,10 @@ pub fn clean_tag(tag: &str) -> String {
 
 fn parts(version: &str) -> [u64; 4] {
     let normalized = normalize_tag(version);
-    let base = normalized.split_once('-').map(|(b, _)| b).unwrap_or(&normalized);
+    let base = normalized
+        .split_once('-')
+        .map(|(b, _)| b)
+        .unwrap_or(&normalized);
     let mut out = [0u64; 4];
     for (i, part) in base.split('.').take(4).enumerate() {
         out[i] = part.parse().unwrap_or(0);

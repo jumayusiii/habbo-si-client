@@ -38,7 +38,10 @@ impl Discord {
     }
 
     pub fn status(&self) -> String {
-        self.status.lock().map(|s| s.clone()).unwrap_or_else(|_| "off".into())
+        self.status
+            .lock()
+            .map(|s| s.clone())
+            .unwrap_or_else(|_| "off".into())
     }
 
     pub fn valid_id(id: &str) -> bool {
@@ -249,7 +252,12 @@ fn pretty_room(room: &str) -> String {
         return s;
     }
     if s.chars().count() > 48 {
-        s = s.chars().take(47).collect::<String>().trim_end().to_string();
+        s = s
+            .chars()
+            .take(47)
+            .collect::<String>()
+            .trim_end()
+            .to_string();
         s.push('…');
     }
     let lower = s.to_lowercase();
@@ -293,20 +301,37 @@ mod tests {
 
     #[test]
     fn presence_is_sentence_cased() {
-        assert_eq!(presence_details("SUNSET LOUNGE"), "Hanging out in Sunset Lounge");
-        assert_eq!(presence_details("sunset lounge"), "Hanging out in Sunset Lounge");
-        assert_eq!(presence_details("Sunset Lounge"), "Hanging out in Sunset Lounge");
+        assert_eq!(
+            presence_details("SUNSET LOUNGE"),
+            "Hanging out in Sunset Lounge"
+        );
+        assert_eq!(
+            presence_details("sunset lounge"),
+            "Hanging out in Sunset Lounge"
+        );
+        assert_eq!(
+            presence_details("Sunset Lounge"),
+            "Hanging out in Sunset Lounge"
+        );
         assert_eq!(presence_details(""), "Exploring the hotel");
     }
 
     #[test]
     fn activity_contains_the_expected_shape() {
         let value: Value = serde_json::from_str(&activity_json(
-            42, 100, "Hanging out in Sunrise", "On habbo.si", ARTWORK_URL, "Habbo.si Client",
+            42,
+            100,
+            "Hanging out in Sunrise",
+            "On habbo.si",
+            ARTWORK_URL,
+            "Habbo.si Client",
         ))
         .unwrap();
         assert_eq!(value["cmd"], "SET_ACTIVITY");
         assert_eq!(value["args"]["pid"], 42);
-        assert_eq!(value["args"]["activity"]["details"], "Hanging out in Sunrise");
+        assert_eq!(
+            value["args"]["activity"]["details"],
+            "Hanging out in Sunrise"
+        );
     }
 }
